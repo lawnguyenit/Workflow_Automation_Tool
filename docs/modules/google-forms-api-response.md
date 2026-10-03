@@ -39,6 +39,7 @@ The form ID in the workflow is a placeholder. In the current authenticated local
 ## Verification
 
 - Unit tests cover responseId event identity, exact title-to-question-ID mapping, missing answer handling, Form mismatch, title drift/duplication, multiple/non-text answers, answer length bounds, and sanitized API results.
+- Re-ran `tests/integration/google_forms_api_lead_postgres.py` inside the Compose API container with synthetic data: mapping succeeded; storage returned `STORED`, same-event retry returned `DUPLICATE`, and changed payload returned `PAYLOAD_CONFLICT_REVIEW`. The harness cleaned its synthetic event and a follow-up count returned zero. Google Forms API was not called.
 - The inactive n8n export is structurally tested for read-only OAuth placeholders, bounded pagination, no saved execution data, successful-store cursor advancement, and `DRY_RUN` non-consumption.
 - The committed polling export is imported in local n8n and remains inactive. The separate committed manual preview export is imported and has one successful n8n UI execution to the local API using synthetic `DRY_RUN` data. Neither fact establishes Google API access or poller runtime.
 - No Google API call or OAuth authorization has occurred. No actual Form response was read or stored.

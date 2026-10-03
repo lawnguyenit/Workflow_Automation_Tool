@@ -9,6 +9,12 @@
 - This verifies successful import and visible graph state only. The poller was not executed; no Google OAuth consent/API call or response read occurred, and the placeholder Form ID is still present. The prior successful n8n UI execution belongs to the separate synthetic two-node `DRY_RUN` preview.
 - The Upwork lead-management brief remains incomplete. GHL/LLM live operations, follow-up composition and stop events, monitoring/recovery, and client acceptance remain open.
 
+### Forms API pipeline integration — 2026-10-03
+
+- Re-ran `Get-Content -Raw tests/integration/google_forms_api_lead_postgres.py | docker compose exec -T api python -` against the Compose `workflow_automation` PostgreSQL database. The harness checks the URL database path before cleanup, uses only `.invalid` synthetic lead data and a synthetic FormResponse, and does not contact Google, n8n, GHL, an LLM, or an email provider.
+- Observed mapping success, first write `STORED`, same-response retry `DUPLICATE`, and changed payload under the same source event `PAYLOAD_CONFLICT_REVIEW`. The harness reported cleanup complete; a separate read-only SQL count for its `google_forms_api` test namespace returned `0` rows afterward.
+- This verifies the Python mapper → lead qualification/store → local PostgreSQL boundary in `MOCK` mode. It does not verify Google OAuth/API, the imported poller, or any external CRM/follow-up behavior.
+
 - `lead.followup_gate` is registered in the module catalog and portfolio instances. It supports eligibility `check` and durable `record_event`; the lead graph and n8n export do not call it yet.
 - PostgreSQL migration 005 was applied to the existing local Compose database. The gate stores digests and enums only, requires explicit enrollment, uses stable event idempotency, and fails closed on missing/unavailable state.
 - Unit tests cover dry-run/replay blocking, strict input, hashing/no source identifier echo, blocked check, event conflict/unavailability, stop recording, and exact/stale pause resume behavior.
