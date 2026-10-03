@@ -1,0 +1,125 @@
+job_id: portfolio-lead-management-upwork-brief
+status: intake
+last_updated: 2026-10-03
+source_brief:
+  reference: "User-provided Upwork lead-management brief in this conversation"
+  client_replies:
+    - "User selected Google Forms API read-only for the portfolio source."
+    - "User selected a dedicated Google Cloud project."
+    - "User authorized one self-addressed test email; that one-time send was already used through the connected Gmail app."
+goal: >-
+  Build a reusable, reviewable lead-management reference instance that captures a
+  form enquiry, validates and qualifies it, updates one GoHighLevel pipeline, and
+  sends approved follow-up with duplicate protection, stop conditions, operations
+  documentation, and evidence appropriate to the user's own authorized accounts.
+non_goals:
+  - "Publicly publish the test Form or expose a public webhook/tunnel."
+  - "Use real prospects or third-party recipients during the portfolio exercise."
+  - "Use the user's game VPS at 103.178.234.213:2786."
+  - "Claim live provider behavior from mocks, fixtures, or local module tests."
+  - "Add unrelated CRM/provider integrations without job demand."
+inputs_and_sources:
+  - description: "Google Forms API schema and response pages, read-only scopes only"
+    reference: "Private unpublished Lead Intake Lab - Test Only Form; private ID omitted from Git"
+    state: confirmed
+  - description: "Original requested source is one website form or webhook; portfolio owner selected a private Google Form"
+    reference: "DEC-010 and current owner account inventory"
+    state: confirmed
+  - description: "Synthetic response fields: name, email, optional phone, service, request description"
+    reference: "docs/modules/lead-management-reference.md and local mapper fixtures"
+    state: confirmed
+target_entities:
+  - "One source event per Forms FormResponse"
+  - "One normalized lead record per accepted source event"
+  - "One GoHighLevel contact with configured custom fields/tags"
+  - "One opportunity in a configured pipeline/stage"
+  - "One acknowledgement and policy-approved follow-up sequence per enrolled lead"
+requested_fields_and_transforms:
+  - "Map exact Form question title/question ID to canonical lead fields."
+  - "Trim and normalize contact values; flag missing/invalid required fields for review."
+  - "Extract requested service, summarize enquiry, and classify only under an approved rubric."
+  - "Store event identity, processing status, qualification result, and CRM identifiers with minimized sensitive output."
+business_definitions:
+  - "Qualification rubric, accepted labels, and the decision that permits follow-up are owner-defined and unresolved."
+  - "Contact duplicate matching, custom fields, tag names, pipeline/stage, and opportunity update rules are GHL-account-specific and unresolved."
+  - "Enrollment, acknowledgement/follow-up text, cadence, booking link, consent basis, and stop-event sources are owner-defined and unresolved."
+scope:
+  volume: "Unknown; current n8n poller is a low-volume reference with a bounded 900-second source lease."
+  cadence: "One source, one pipeline, one qualification flow, one follow-up sequence; poll template interval is five minutes when owner activates it."
+output_and_delivery:
+  format: "Inactive n8n export without embedded secrets, reusable module contracts/implementations, setup/runbook, verification matrix, and handover material."
+  destination: "User-owned local Docker/n8n portfolio; GitHub repository for reusable source and documentation only."
+intended_use: "Portfolio practice for future n8n/automation jobs; not a client production deployment."
+retention: "Unknown for any future real provider data; current tests use synthetic data and local retention only."
+access_facts:
+  - "Gmail and Outlook accounts exist with 2FA; the local automation runtime has no Gmail sender credential."
+  - "Google Forms API is enabled in a dedicated project; Google Auth Platform branding setup is unsubmitted pending separate owner confirmation. No OAuth client/grant or Forms API request exists."
+  - "The private Form remains unpublished with zero responses; exact API question IDs are unverified."
+  - "No GHL/CRM account or OpenAI API key is available. ChatGPT Plus does not supply an OpenAI API credential."
+  - "No public HTTPS endpoint is configured. Local API and n8n bind to loopback; VPS is excluded."
+  - "Docker API, n8n, and PostgreSQL run locally; latest checks show API/n8n health 200 and PostgreSQL healthy."
+acceptance_criteria:
+  - id: AC-001
+    statement: "One authorized test enquiry is captured from the selected source and its exact response identity is retained."
+    verification: "Run the inactive-by-default n8n poller against an owner-controlled synthetic Form response; verify live Forms API schema/response and source event key."
+    state: confirmed
+  - id: AC-002
+    statement: "Missing/invalid required values are normalized or flagged for manual review without fabrication."
+    verification: "Test complete, missing, invalid, title-drift, and unsupported answer payloads through the composed path."
+    state: confirmed
+  - id: AC-003
+    statement: "Qualification extracts service, summary, and class from approved criteria; ambiguous/missing information is flagged."
+    verification: "Run owner-approved rubric and one live model request under provider-side spending limits; assert malformed/uncertain outputs route to review."
+    state: unknown
+  - id: AC-004
+    statement: "GHL contact/custom fields/tags and opportunity are created or updated in the correct pipeline/stage."
+    verification: "Use a GHL test Location and owner-approved mappings; inspect the resulting test contact/opportunity and duplicate behavior."
+    state: unknown
+  - id: AC-005
+    statement: "Approved acknowledgement/follow-up sends once and stops after reply, booking, opt-out, or manual pause."
+    verification: "Run controlled self-owned test messages and each authoritative stop event; verify sender and suppression state."
+    state: unknown
+  - id: AC-006
+    statement: "Repeated source events, workflow retries, and uncertain remote outcomes do not duplicate records or messages."
+    verification: "Exercise repeated FormResponse, changed-payload conflict, concurrent CRM/send attempts, and unknown-outcome reconciliation."
+    state: confirmed
+  - id: AC-007
+    statement: "Failures are visible and recoverable through bounded retry, alerting, reconciliation, and safe replay."
+    verification: "Inject provider/DB/LLM failures and demonstrate alert, operator resolution, and replay without duplicate side effects."
+    state: confirmed
+  - id: AC-008
+    statement: "The team receives a secret-free workflow export, setup guide, and recorded handover."
+    verification: "Scan export for credentials; follow setup from a clean local instance; record owner-reviewed handover."
+    state: confirmed
+  - id: AC-009
+    statement: "One test enquiry reaches qualification, GHL, and the correct follow-up without manual copying."
+    verification: "Run the complete agreed acceptance matrix from source event through CRM and follow-up and obtain owner acceptance."
+    state: confirmed
+unknowns:
+  - id: UNK-001
+    question: "Will the owner accept Google API Services User Data Policy and complete read-only Forms OAuth setup?"
+    owner: user
+    blocking: true
+    verification_or_stop_condition: "Wait for explicit confirmation of the separate checkbox; then the owner creates/enters client credentials directly in the Google/n8n UI and inspects requested read-only scopes."
+  - id: UNK-002
+    question: "Can the owner provide a GHL test account/Location and approve matching, fields, tags, pipeline and opportunity rules?"
+    owner: user
+    blocking: true
+    verification_or_stop_condition: "Do not call GHL until the account and mapping/policy decisions are provided."
+  - id: UNK-003
+    question: "Will the owner provide a separate OpenAI API credential, approved rubric, and provider-side USD limit?"
+    owner: user
+    blocking: true
+    verification_or_stop_condition: "Keep live model calls disabled until all three are configured through a secure path."
+  - id: UNK-004
+    question: "What sender, approved content, enrollment/consent policy, cadence, booking target, and authoritative stop-event sources should control follow-up?"
+    owner: user
+    blocking: true
+    verification_or_stop_condition: "Do not send follow-up or compose business-specific stop routing until policy and sources are approved."
+  - id: UNK-005
+    question: "Who receives alerts and owns remote-outcome reconciliation/recovery?"
+    owner: user
+    blocking: true
+    verification_or_stop_condition: "No production-readiness claim until a destination, owner, and recovery runbook are tested."
+readiness: READY_FOR_DISCOVERY
+next_owner_action: "Resolve access and business-policy gates above; implementation lead may continue bounded local design and synthetic verification meanwhile."

@@ -1,0 +1,138 @@
+job_id: portfolio-lead-management-upwork-brief
+last_updated: 2026-10-03
+tasks:
+  - id: TASK-001
+    caller: workflow lead
+    callee: user
+    objective: "Confirm the separate Google API Services User Data Policy checkbox decision."
+    inputs: ["DEC-JOB-003", "Google Auth Platform final setup screen"]
+    expected_output: "Explicit accept-or-stop decision; no secret values."
+    owner: user
+    allowed_files: []
+    dependencies: []
+    preconditions: ["User understands this is separate from the already accepted Google APIs Terms of Service and authorizes read-only Forms scope only."]
+    must_not_change: ["Do not publish the Form", "Do not create OAuth client/secret before this decision", "Do not activate workflow"]
+    blocking_or_stop_condition: "No response means OAuth setup remains stopped."
+    acceptance_checks: ["Decision recorded in DECISIONS.yaml before any checkbox submission."]
+    verification: []
+    status: blocked
+  - id: TASK-002
+    caller: workflow lead
+    callee: user
+    objective: "After TASK-001 approval, create/read-only OAuth client and connect only the intended Google account to local n8n."
+    inputs: ["DEC-JOB-001/002", "docs/runbooks/google-forms-api-local-oauth.md"]
+    expected_output: "Owner-entered OAuth credential in n8n and private Form ID stored only locally."
+    owner: user
+    allowed_files: []
+    dependencies: [TASK-001]
+    preconditions: ["Explicit policy checkbox decision", "OAuth redirect URI verified in n8n", "scope list inspected"]
+    must_not_change: ["No public publishing/tunnel", "No credential in chat/Git/workflow export", "No real respondents"]
+    blocking_or_stop_condition: "Owner may stop at any Google consent screen that requests broader/write scopes."
+    acceptance_checks: ["Consent lists only forms.body.readonly and forms.responses.readonly", "credential connects to intended account", "Form remains unpublished"]
+    verification: ["Owner-observed read-only API call with synthetic-only Form data; verify schema and response mapping."]
+    status: blocked
+  - id: TASK-003
+    caller: workflow lead
+    callee: user
+    objective: "Provide a GHL test Location and approve the contact, field, tag, pipeline, stage, and duplicate/opportunity policies."
+    inputs: ["DEC-JOB-005", "docs/modules/ghl-contact-upsert.md", "docs/modules/ghl-contact-tags.md", "docs/modules/ghl-opportunity-upsert.md"]
+    expected_output: "Test account plus explicit mapping/decision artifact; token remains in protected credential UI."
+    owner: user
+    allowed_files: []
+    dependencies: []
+    preconditions: ["Owner chooses to provision/access GHL and accepts any account cost."]
+    must_not_change: ["No live CRM write until test Location and mapping are verified."]
+    blocking_or_stop_condition: "No GHL account or policy means adapters remain separate synthetic modules."
+    acceptance_checks: ["Owner approves identity-match logic and open/closed opportunity behavior."]
+    verification: []
+    status: blocked
+  - id: TASK-004
+    caller: workflow lead
+    callee: user
+    objective: "Provide an OpenAI API credential, qualification rubric, privacy decision, and provider-side USD budget."
+    inputs: ["DEC-JOB-006", "docs/modules/lead-qualification.md"]
+    expected_output: "Protected API credential, approved labels/rubric, and monetary budget control."
+    owner: user
+    allowed_files: []
+    dependencies: []
+    preconditions: ["Owner chooses to create/use a separate API account and accepts its billing model."]
+    must_not_change: ["ChatGPT Plus is not treated as API credit", "No live paid call until all inputs exist."]
+    blocking_or_stop_condition: "No key, rubric, or spend control keeps all leads in manual review."
+    acceptance_checks: ["Owner confirms output classes, request count limit, and provider-side USD budget."]
+    verification: []
+    status: blocked
+  - id: TASK-005
+    caller: workflow lead
+    callee: workflow lead
+    objective: "Compose the existing validated lead path with GHL steps and durable per-effect recovery only after owner mappings exist."
+    inputs: ["PIPELINE.yaml CAP-005/CAP-006 and EDGE-005", "DEC-JOB-005"]
+    expected_output: "Reusable workflow composition and durable outbox/effect/reconciliation path with module documentation."
+    owner: workflow lead
+    allowed_files: ["src/workflow_automation/", "tests/", "docs/modules/", "docs/project-state/lead-management/"]
+    dependencies: [TASK-003]
+    preconditions: ["GHL mapping and desired account behavior approved", "cursor semantics reconciled with CRM completion/recovery"]
+    must_not_change: ["Do not advance Forms checkpoint while remote CRM effect is unaccepted/unreconciled", "Do not claim exactly-once provider writes"]
+    blocking_or_stop_condition: "No account/business policy means no GHL composition can be accepted."
+    acceptance_checks: ["duplicate/concurrent/unknown-outcome checks", "provider-offline recovery", "fresh-install migration and rollback evidence"]
+    verification: []
+    status: blocked
+  - id: TASK-006
+    caller: workflow lead
+    callee: user
+    objective: "Approve follow-up sender/channel, message, cadence, booking link, enrollment/consent, lifecycle event sources, alert target, and recovery owner."
+    inputs: ["DEC-JOB-007", "docs/modules/lead-followup-gate.md", "docs/modules/gmail-send.md"]
+    expected_output: "Explicit follow-up/stop-event and recovery policy."
+    owner: user
+    allowed_files: []
+    dependencies: []
+    preconditions: ["User acknowledges the prior one-time self-addressed test permission is already consumed."]
+    must_not_change: ["No lead or third-party message until new policy and authorization exist.", "No guessed booking/event integration."]
+    blocking_or_stop_condition: "Missing policy/event producers keep the gate unconnected and sending off."
+    acceptance_checks: ["Each send has immediately preceding fail-closed gate check", "all stop events block the next send", "unknown send result requires reconciliation"]
+    verification: []
+    status: blocked
+  - id: TASK-007
+    caller: workflow lead
+    callee: workflow lead
+    objective: "Implement lead-level monitoring, alerting, dead-letter/reconciliation runbook, and safe replay."
+    inputs: ["PIPELINE.yaml CAP-009", "owner alert/recovery decisions"]
+    expected_output: "Sanitized failure alerts and tested operator recovery path."
+    owner: workflow lead
+    allowed_files: ["src/workflow_automation/", "tests/", "docs/modules/", "docs/runbooks/", "docs/project-state/lead-management/"]
+    dependencies: [TASK-003, TASK-006]
+    preconditions: ["Alert destination and named recovery owner are approved"]
+    must_not_change: ["No PII, tokens, private Form IDs, or full provider bodies in alerts/logs"]
+    blocking_or_stop_condition: "No destination/owner prevents a meaningful end-to-end recovery test."
+    acceptance_checks: ["provider/DB/LLM failure injection", "alert visible", "reconcile then safe replay without duplicate side effects"]
+    verification: []
+    status: blocked
+  - id: TASK-008
+    caller: user
+    callee: user
+    objective: "Add the local API bearer to n8n's protected credential store and bind it to local API request nodes without sharing/exporting the secret."
+    inputs: ["n8n inactive workflow", "local API bearer already configured in API environment"]
+    expected_output: "Credential reference bound to API HTTP Request nodes, verified without exposing secret."
+    owner: user
+    allowed_files: []
+    dependencies: []
+    preconditions: ["Use owner-controlled credential setup path; no API key is printed, committed, or sent in chat."]
+    must_not_change: ["Workflow remains inactive", "credential-free committed export", "no Google/API write side effects"]
+    blocking_or_stop_condition: "Credential remains unset until protected n8n credential entry is done."
+    acceptance_checks: ["n8n HTTP call authenticated in safe synthetic test", "export omits secret value"]
+    verification: []
+    status: blocked
+  - id: TASK-009
+    caller: workflow lead
+    callee: independent deliverable auditor
+    objective: "Re-audit the completed instance against the same full brief and actual runtime evidence."
+    inputs: ["JOB_SPEC.yaml", "DECISIONS.yaml", "DISCOVERY.yaml", "PIPELINE.yaml", "TASKS.yaml", "acceptance evidence"]
+    expected_output: "Independent criterion matrix and explicit pass/fail/unknown decision."
+    owner: independent deliverable auditor
+    allowed_files: ["docs/project-state/lead-management/"]
+    dependencies: [TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008]
+    preconditions: ["Build and owner-approved acceptance runs completed"]
+    must_not_change: ["Auditor is read-only and does not call providers."]
+    blocking_or_stop_condition: "Any required criterion lacking evidence keeps the overall audit failed/incomplete."
+    acceptance_checks: ["Full source-to-follow-up path independently inspected", "fresh live and failure-recovery evidence classified", "user acceptance separate"]
+    verification: ["Current preliminary audit: docs/project-state/AUDIT-0.12.0.yaml (FAILED_AUDIT)."]
+    status: blocked

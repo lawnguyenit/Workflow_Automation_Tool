@@ -1,0 +1,75 @@
+job_id: portfolio-lead-management-upwork-brief
+last_updated: 2026-10-03
+decisions:
+  - id: DEC-JOB-001
+    question: "Which source should the portfolio instance use?"
+    options_considered: ["Google Forms API read-only", "Google Sheets Trigger", "Public webhook"]
+    decision: "Google Forms API with Forms body and responses read-only scopes; private unpublished test Form only."
+    status: approved
+    owner: user
+    evidence_or_rationale: "User selected Forms API read-only; minimizes source access and avoids a public endpoint."
+    date: 2026-10-03
+    supersedes: null
+  - id: DEC-JOB-002
+    question: "Where should Google OAuth be configured?"
+    options_considered: ["Existing unrelated Google project", "Dedicated project"]
+    decision: "Dedicated Google Cloud project; Forms API enabled."
+    status: approved
+    owner: user
+    evidence_or_rationale: "User selected a separate project; current UI setup confirms Forms API enabled."
+    date: 2026-10-03
+    supersedes: null
+  - id: DEC-JOB-003
+    question: "May the separate Google API Services User Data Policy checkbox be accepted to create OAuth branding?"
+    options_considered: ["Accept and continue", "Do not accept; stop Google OAuth setup"]
+    decision: "Unresolved; no checkbox was selected or submitted."
+    status: unresolved
+    owner: user
+    evidence_or_rationale: "This is separate from the Google APIs Terms of Service approval and remains an explicit pending owner confirmation."
+    date: 2026-10-03
+    supersedes: null
+  - id: DEC-JOB-004
+    question: "May the workflow use public hosting or the game VPS?"
+    options_considered: ["Expose a webhook/tunnel", "Keep local Forms polling"]
+    decision: "Keep local; do not use the VPS or expose a public endpoint."
+    status: approved
+    owner: user
+    evidence_or_rationale: "No public endpoint exists; VPS hosts a game and is excluded. Forms polling requires no inbound webhook."
+    date: 2026-10-03
+    supersedes: null
+  - id: DEC-JOB-005
+    question: "What is the GHL contact/opportunity matching policy?"
+    options_considered: ["Account-defined policy", "Conservative open-opportunity exact-match default"]
+    decision: "Unresolved. The reusable opportunity module's exact open-match behavior remains a proposal, not a live account rule."
+    status: unresolved
+    owner: user
+    evidence_or_rationale: "No GHL account, Location, or pipeline mapping is available."
+    date: 2026-10-03
+    supersedes: null
+  - id: DEC-JOB-006
+    question: "What qualifies a lead for automatic follow-up?"
+    options_considered: ["Owner-approved rubric and enrollment policy", "Manual review for all leads"]
+    decision: "Unresolved; current module fails closed to review if an approved rubric/result is unavailable."
+    status: unresolved
+    owner: user
+    evidence_or_rationale: "No business criteria, OpenAI API credential, provider USD cap, or consent policy exists."
+    date: 2026-10-03
+    supersedes: null
+  - id: DEC-JOB-007
+    question: "Which message policy, cadence, booking link, and stop-event source should be used?"
+    options_considered: ["GHL workflows", "Gmail sender", "Other owner-approved channel"]
+    decision: "Unresolved. No lead follow-up message is authorized by the prior one-time self-addressed test email permission."
+    status: unresolved
+    owner: user
+    evidence_or_rationale: "The one-time self-addressed email was already used; no recipient/enrollment/content/schedule/event rules exist."
+    date: 2026-10-03
+    supersedes: null
+  - id: DEC-JOB-008
+    question: "How should unverified/uncertain qualification be handled?"
+    options_considered: ["Guess a class", "Fail closed and route to manual review"]
+    decision: "Fail closed to manual review; never invent missing lead details."
+    status: approved
+    owner: workflow lead
+    evidence_or_rationale: "Explicit Upwork brief requirement and implemented qualification contract."
+    date: 2026-10-03
+    supersedes: null

@@ -1,0 +1,253 @@
+job_id: portfolio-lead-management-upwork-brief
+status: proposed
+last_updated: 2026-10-03
+acceptance_mapping:
+  - criterion_id: AC-001
+    capability_ids: [CAP-001, CAP-002]
+    checks: ["Owner-authorized Forms API poll in n8n", "verify live Form question IDs and response identity"]
+  - criterion_id: AC-002
+    capability_ids: [CAP-002, CAP-003]
+    checks: ["valid/missing/invalid/title-drift fixtures", "manual-review status for uncertainty"]
+  - criterion_id: AC-003
+    capability_ids: [CAP-004]
+    checks: ["approved rubric live result", "malformed/uncertain output routes to manual review", "provider-side cost cap"]
+  - criterion_id: AC-004
+    capability_ids: [CAP-006]
+    checks: ["approved account mappings", "contact/tag/opportunity create-update behavior", "remote unknown-outcome reconciliation"]
+  - criterion_id: AC-005
+    capability_ids: [CAP-007, CAP-008]
+    checks: ["approved enrollment and one-time sends", "reply/book/opt-out/pause stops before each send"]
+  - criterion_id: AC-006
+    capability_ids: [CAP-001, CAP-005, CAP-006, CAP-007, CAP-008]
+    checks: ["source replay", "same-event and changed-payload outcomes", "concurrent/unknown CRM and sender effect behavior"]
+  - criterion_id: AC-007
+    capability_ids: [CAP-009]
+    checks: ["provider/DB/LLM fault injection", "alert delivery", "operator reconciliation and safe replay"]
+  - criterion_id: AC-008
+    capability_ids: [CAP-001, CAP-006, CAP-008, CAP-009]
+    checks: ["secret scan of all workflow exports", "clean setup exercise", "handover artifact"]
+  - criterion_id: AC-009
+    capability_ids: [CAP-001, CAP-002, CAP-003, CAP-004, CAP-005, CAP-006, CAP-007, CAP-008, CAP-009]
+    checks: ["one complete synthetic owner-account run", "failure/recovery matrix", "user acceptance"]
+capabilities:
+  - id: CAP-001
+    purpose: "Read Google Form schema/response pages and coordinate per-Form polling cursor."
+    implementation_source: "workflows/n8n/lead-management-google-forms-api.local.json; portfolio.google_forms_poll_checkpoint; docs/modules/source-poll-checkpoint.md"
+    classification: reuse
+    evidence: ["18-node inactive n8n graph imported and structurally inspected", "synthetic PostgreSQL checkpoint integration passed", "no live Forms request"]
+    module_contract:
+      input: "Owner-provided private Form ID, OAuth credential with only Forms body/responses read-only scopes, prior UTC timestamp cursor."
+      output: "Paged Form schema/responses plus a fenced lease/cursor result."
+      assumptions_and_preconditions: ["One low-volume local poller", "Google OAuth consent explicitly approved", "Form remains owner-controlled and uses synthetic test response only"]
+      postconditions: ["Cursor commits monotonically only after accepted local response-store outcomes", "empty poll releases lease"]
+      failures_and_partial_results: ["OAuth/API/page error stops without commit", "remaining page token at cap fails closed", "lost lease rejects commit; prior cursor can replay events"]
+      side_effects_permissions_and_limits: ["Read-only Forms API scopes", "900-second PostgreSQL lease", "No public endpoint", "lease cannot cancel work already in progress"]
+      dependencies_and_compatibility: ["n8n 2.41.6", "local API/PostgreSQL", "no provider runtime test"]
+      verification: ["synthetic checkpoint integration", "workflow inactive/uncredentialed", "live Form read pending"]
+  - id: CAP-002
+    purpose: "Map a single Forms API response to a canonical lead event."
+    implementation_source: "src/workflow_automation/modules/input/google_forms_api_response.py; docs/modules/google-forms-api-response.md"
+    classification: reuse
+    evidence: ["unit tests and synthetic Forms API response-to-PostgreSQL integration"]
+    module_contract:
+      input: "form_id, matching form schema, one response with responseId/answers."
+      output: "Canonical lead fields and stable source identity <formId>:<responseId>."
+      assumptions_and_preconditions: ["Exact configured question titles and API question IDs are verified against the live Form before use"]
+      postconditions: ["Mapping is deterministic and bounded"]
+      failures_and_partial_results: ["Mismatched form, drifted/ambiguous title, unsupported answer shape or over-limit data returns a sanitized review/error result"]
+      side_effects_permissions_and_limits: ["No provider call or storage side effect", "does not deduplicate a person across submissions"]
+      dependencies_and_compatibility: ["Called by local workflow API after n8n source retrieval"]
+      verification: ["synthetic mapper/store outcomes pass", "live API schema unverified"]
+  - id: CAP-003
+    purpose: "Normalize lead values and mark missing/invalid required fields."
+    implementation_source: "src/workflow_automation/modules/processing/lead_intake.py; docs/modules/lead-management-reference.md"
+    classification: reuse
+    evidence: ["unit/API and synthetic composition evidence"]
+    module_contract:
+      input: "Canonical lead event from CAP-002."
+      output: "Trimmed bounded contact/service/enquiry values plus validation/review reasons."
+      assumptions_and_preconditions: ["Field meaning and required set are from the approved Form mapping"]
+      postconditions: ["Missing values are flagged; no country code or missing field is invented"]
+      failures_and_partial_results: ["Invalid fields route to review while preserving stable source identity when safe"]
+      side_effects_permissions_and_limits: ["No external side effects", "phone normalization is not full E.164 validation"]
+      dependencies_and_compatibility: ["Local workflow API composition"]
+      verification: ["synthetic and unit checks; real Form schema unverified"]
+  - id: CAP-004
+    purpose: "Extract service, summarize, and classify under an owner-approved rubric, otherwise manual review."
+    implementation_source: "src/workflow_automation/modules/processing/lead_qualify.py; docs/modules/lead-qualification.md"
+    classification: reuse
+    evidence: ["structured-output module and durable PostgreSQL ledger unit/integration evidence"]
+    module_contract:
+      input: "Normalized service/enquiry, explicit rubric/labels, model/prompt config, stable event identity."
+      output: "Validated classification/summary/confidence/missing-information or REVIEW_REQUIRED."
+      assumptions_and_preconditions: ["Owner approves rubric, data use, provider-side USD spend cap, and credential before LIVE mode"]
+      postconditions: ["Claim/cached result protects repeat model requests for stable event/fingerprint"]
+      failures_and_partial_results: ["Malformed/uncertain output, changed payload or unknown prior attempt holds for review/reconciliation"]
+      side_effects_permissions_and_limits: ["REAL mode can incur model charges", "UTC-day request count cap is not a monetary spend limit"]
+      dependencies_and_compatibility: ["OpenAI API credential absent", "PostgreSQL migration 004"]
+      verification: ["mock/unit ledger evidence", "no live quality/cost test"]
+  - id: CAP-005
+    purpose: "Persist one accepted lead event with source-event idempotency."
+    implementation_source: "src/workflow_automation/modules/storage/postgres_lead_store.py; docs/modules/lead-management-reference.md"
+    classification: reuse
+    evidence: ["Compose PostgreSQL harness: STORED, DUPLICATE, PAYLOAD_CONFLICT_REVIEW, synthetic cleanup"]
+    module_contract:
+      input: "Canonical lead with source_system/account/event_id and fingerprint."
+      output: "Stored/duplicate/conflict status and canonical local record reference, with sensitive fields suppressed from aggregate API output."
+      assumptions_and_preconditions: ["PostgreSQL migration/schema is current", "stable event identity is retained through retries"]
+      postconditions: ["Unique source event row, first write wins"]
+      failures_and_partial_results: ["Changed payload under same event key requires review; DB failure returns sanitized outcome"]
+      side_effects_permissions_and_limits: ["Local database write", "not person-level or external side-effect dedupe"]
+      dependencies_and_compatibility: ["PostgreSQL Compose service"]
+      verification: ["synthetic PostgreSQL integration; no actual respondent data"]
+  - id: CAP-006
+    purpose: "Upsert GHL contact/custom fields, add tags, and create/update the approved opportunity."
+    implementation_source: "src/workflow_automation/modules/crm/ghl_upsert_contact.py; ghl_contact_tags.py; ghl_upsert_opportunity.py"
+    classification: reuse
+    evidence: ["synthetic HTTP tests; tag/PostgreSQL effect-guard integration", "no GHL account or composed edge"]
+    module_contract:
+      input: "Qualified lead, owner-approved Location/custom-field/tag/pipeline/stage map, protected token."
+      output: "Provider contact/opportunity result or a bounded review/reconciliation state."
+      assumptions_and_preconditions: ["Owner resolves contact match and opportunity update policies", "GHL credentials and scopes configured directly in protected runtime"]
+      postconditions: ["No destructive tag replacement; ambiguous matches/writes hold for review"]
+      failures_and_partial_results: ["Unknown remote outcome blocks unsafe retry; operator reconciles provider state first"]
+      side_effects_permissions_and_limits: ["External CRM write", "separate effect guard does not cover independent external writers", "provider rate limit behavior needs live validation"]
+      dependencies_and_compatibility: ["GHL test Location, token, database migration 003, account mapping"]
+      verification: ["mock/synthetic only; no live contact/opportunity"]
+  - id: CAP-007
+    purpose: "Durably determine whether a lead may receive follow-up and persist stop/pause events."
+    implementation_source: "src/workflow_automation/modules/processing/lead_followup_gate.py; docs/modules/lead-followup-gate.md"
+    classification: reuse
+    evidence: ["synthetic Compose/PostgreSQL tests for event idempotency, stops, concurrency, pause/resume, and fail-closed timeout"]
+    module_contract:
+      input: "HMAC-protected subject/event identities, explicit enrollment or lifecycle event, stable HMAC key."
+      output: "Eligibility/state; a passing check is only point-in-time."
+      assumptions_and_preconditions: ["Owner defines enrollment and authoritative reply/booking/opt-out/pause producers", "stable secret is backed up and held in runtime"]
+      postconditions: ["Terminal stops persist and cannot be reopened by new enrollment"]
+      failures_and_partial_results: ["Missing/unavailable state fails closed", "unknown event payload conflicts require review"]
+      side_effects_permissions_and_limits: ["PostgreSQL state write", "cannot cancel a send already in flight", "key loss/rotation needs reconciliation"]
+      dependencies_and_compatibility: ["PostgreSQL migration 005", "event producer and sender not composed"]
+      verification: ["synthetic local integration; no actual stop-event source"]
+  - id: CAP-008
+    purpose: "Send only owner-approved acknowledgement/follow-up through the selected sender."
+    implementation_source: "src/workflow_automation/modules/output/gmail_send.py; docs/modules/gmail-send.md"
+    classification: adapt
+    evidence: ["module/outbox mock tests; user-level one-time self-addressed test email was sent outside this runtime and permission is consumed"]
+    module_contract:
+      input: "Approved destination/content/template and stable message idempotency key after immediately rechecking CAP-007."
+      output: "Sent/duplicate/failed/unknown result with sensitive body redaction."
+      assumptions_and_preconditions: ["Owner approves sender, enrollment, copy, timing, booking link and recipient policy"]
+      postconditions: ["No send if suppression state is absent/stopped/paused"]
+      failures_and_partial_results: ["Unknown send outcome holds for reconciliation; do not blindly resend"]
+      side_effects_permissions_and_limits: ["External email send; prior one-time test-send permission does not authorize lead follow-up"]
+      dependencies_and_compatibility: ["Local Gmail credential absent; no follow-up policy"]
+      verification: ["no lead message or runtime provider call"]
+  - id: CAP-009
+    purpose: "Alert operators and recover/reconcile partially completed source, CRM, and send effects."
+    implementation_source: "Existing notify/outbox and reconciliation guards; no complete lead recovery workflow exists."
+    classification: adapt
+    evidence: ["Module-level retry/reconciliation states only; no lead-level end-to-end alert/recovery evidence"]
+    module_contract:
+      input: "Sanitized run/correlation identifiers, failed step, retryability, operator destination, and effect status."
+      output: "Alert plus recoverable dead-letter/reconciliation record and runbook action."
+      assumptions_and_preconditions: ["Owner names alert destination and recovery operator", "PII/secret redaction rules are enforced"]
+      postconditions: ["Operator can distinguish safe retry from unknown outcome and resume without duplication"]
+      failures_and_partial_results: ["Alert channel failure must remain visible and not erase pending recovery state"]
+      side_effects_permissions_and_limits: ["No current composition or named owner", "recovery path not exercised"]
+      dependencies_and_compatibility: ["Existing notification outbox; additional composition/configuration required"]
+      verification: ["missing end-to-end failure/recovery exercise"]
+edges:
+  - id: EDGE-001
+    producer: CAP-001
+    consumer: CAP-002
+    compatibility: planned
+    shape_cardinality_ordering: "One matching Form schema plus one FormResponse item at a time; exact API question IDs map to canonical fields."
+    context_provenance: "Preserve private form identity and stable responseId event identity; do not log response body."
+    partial_error_retry_replay: "Page/API failure stops before timestamp checkpoint commit; inclusive timestamp polling can replay; source event key absorbs local replay."
+    side_effects_and_data_boundaries: "Read-only Google request in n8n; OAuth credential stays in n8n, not export/API."
+    verification: ["Static graph and synthetic mapper tests; live source edge unexecuted."]
+  - id: EDGE-002
+    producer: CAP-002
+    consumer: CAP-003
+    compatibility: verified_bounded
+    shape_cardinality_ordering: "One canonical lead record preserving source event identity and field provenance."
+    context_provenance: "Question-title mapping and responseId must survive normalization."
+    partial_error_retry_replay: "Mapping/validation issues route to review or fail closed; no fabrication."
+    side_effects_and_data_boundaries: "No external side effect."
+    verification: ["Synthetic Forms response mapper integration."]
+  - id: EDGE-003
+    producer: CAP-003
+    consumer: CAP-004
+    compatibility: verified_bounded
+    shape_cardinality_ordering: "Normalized lead plus explicit qualification criteria; invalid/missing field flags remain attached."
+    context_provenance: "Stable source event and review reasons survive."
+    partial_error_retry_replay: "Uncertain/missing values block automatic classification or follow-up."
+    side_effects_and_data_boundaries: "Model receives only fields required by the rubric; contact identifiers excluded by current implementation."
+    verification: ["Synthetic/module test coverage; no live model call."]
+  - id: EDGE-004
+    producer: CAP-004
+    consumer: CAP-005
+    compatibility: verified_bounded
+    shape_cardinality_ordering: "Qualification result and normalized lead stored under stable source-event identity."
+    context_provenance: "Fingerprint protects first-write-wins semantics; conflict requires review."
+    partial_error_retry_replay: "Same event is DUPLICATE; changed payload is PAYLOAD_CONFLICT_REVIEW; DB failure prevents checkpoint acceptance."
+    side_effects_and_data_boundaries: "PostgreSQL only; sensitive values remain local."
+    verification: ["Synthetic Compose/PostgreSQL integration returned STORED/DUPLICATE/PAYLOAD_CONFLICT_REVIEW."]
+  - id: EDGE-005
+    producer: CAP-005
+    consumer: CAP-006
+    compatibility: blocked
+    shape_cardinality_ordering: "Lead storage does not currently return configured GHL mapping or complete remote-effect checkpoint."
+    context_provenance: "Source event identity must bind CRM guard and reconciliation state."
+    partial_error_retry_replay: "Cannot let source cursor advance past an unrecoverable CRM effect; require durable outbox/effect state and explicit reconciliation before commit or independent replay."
+    side_effects_and_data_boundaries: "Would cross local database to external GHL; requires owner token/mapping and effect guard."
+    verification: ["No composed GHL edge or account. Synthetic adapters only."]
+  - id: EDGE-006
+    producer: CAP-006
+    consumer: CAP-007
+    compatibility: blocked
+    shape_cardinality_ordering: "Qualified/CRM-updated lead must satisfy owner-defined enrollment predicate and acquire stable suppression identity."
+    context_provenance: "Contact/source identifiers require HMAC boundaries and minimum retention."
+    partial_error_retry_replay: "Do not enroll on review/failed CRM state; duplicates must not reset a terminal stop."
+    side_effects_and_data_boundaries: "GHL and local PostgreSQL state; policy and event producer not configured."
+    verification: ["No edge or owner enrollment policy."]
+  - id: EDGE-007
+    producer: CAP-007
+    consumer: CAP-008
+    compatibility: blocked
+    shape_cardinality_ordering: "Gate check occurs immediately before each send and uses a stable message/effect key."
+    context_provenance: "A passing point-in-time check must be tied to exact subject, sequence step, and stop state."
+    partial_error_retry_replay: "Stopped/paused/unavailable gate blocks send; provider unknown outcome holds for manual reconciliation."
+    side_effects_and_data_boundaries: "External send follows local gate; an in-flight send cannot be recalled by a later stop event."
+    verification: ["No sender/gate composition or authoritative stop events."]
+  - id: EDGE-008
+    producer: CAP-006
+    consumer: CAP-009
+    compatibility: planned
+    shape_cardinality_ordering: "Sanitized run/correlation ID plus CRM step outcome and retryability."
+    context_provenance: "Avoid PII, private Form ID, provider tokens, message body, or raw provider payload in alerts."
+    partial_error_retry_replay: "Distinguish known failure from unknown remote outcome and route to safe retry or reconciliation."
+    side_effects_and_data_boundaries: "Alert and operator store are separate effects; alert failure cannot erase the original failure state."
+    verification: ["No composed lead alert path."]
+stop_and_recovery:
+  - "No Google Auth Platform submission, OAuth client creation, consent, or Forms request until the owner confirms the separate User Data Policy checkbox."
+  - "Do not activate the poller or read any Form responses until OAuth scopes and the private Form ID are checked; use synthetic-only response data."
+  - "Do not run GHL writes until account, Location, matching, custom fields, tags, pipeline, stage, and opportunity rules are approved."
+  - "Do not make paid model calls until API credential, rubric, privacy decision, and provider-side monetary spend cap are configured."
+  - "Do not enroll/send follow-up until approved copy, channel, cadence, booking link, consent, stop-event sources, and recovery owner are configured."
+  - "Unknown external outcome requires reconciliation; do not blindly retry or advance source/cursor as fully complete."
+  - "Checkpoint lease expiry can replay source work; every future remote side effect needs its own durable idempotency/reconciliation guard."
+  - "Alert destination/recovery owner and dead-letter/runbook remain unassigned."
+workflow_success_condition: >-
+  One owner-approved synthetic response is read through the authorized Forms API,
+  mapped, validated, qualified under an approved rubric (or explicitly sent to
+  manual review), stored once, written to the correct GHL contact/opportunity,
+  and sent the approved acknowledgement/follow-up exactly once unless an authoritative
+  stop event blocks it; failures alert an owner and recover without duplicate effects;
+  secret-free export and handover are reviewed and accepted by the user.
+unresolved_items:
+  - "Google policy checkbox and OAuth client/grant/Form ID remain owner access gates."
+  - "Local API bearer credential is not assigned to n8n MOCK/REAL requests."
+  - "GHL/AI accounts and all business-specific mappings/rubric/budgets are absent."
+  - "No durable composed CRM/send outbox, authoritative stop-event ingestion, alert destination, or tested operator recovery path exists."
+  - "User acceptance remains outstanding."

@@ -1,0 +1,84 @@
+job_id: portfolio-lead-management-upwork-brief
+status: in_progress
+last_updated: 2026-10-03
+caller: workflow lead
+callee: workflow lead
+question_and_scope: "Inspect existing Forms source, lead modules, local runtime, account gates, and failure semantics without calling external providers."
+method_and_environment: "Repository source/docs, n8n 2.41.6 workflow records, Docker Compose API/PostgreSQL, synthetic integration harnesses."
+access_basis: "User authorized a private read-only Forms API portfolio setup. Google API Terms approval does not replace pending confirmation for the separate Google API Services User Data Policy. No live Form access is authorized/configured yet."
+navigation_journey:
+  - step: "Inspect lead workflow definitions and module documentation."
+    url_or_control: "src/workflow_automation/definitions.py; docs/modules/lead-management-reference.md"
+    observation: "The current Forms API composition ends at map → intake → qualification/review → PostgreSQL store."
+    evidence_type: observed
+  - step: "Inspect current n8n and local service state."
+    url_or_control: "Docker Compose health endpoints; n8n workflow list"
+    observation: "API and n8n health endpoints return 200; PostgreSQL is healthy; no workflow is active. The Forms API poller is recorded as an inactive 18-node workflow with placeholder Form ID and no credentials."
+    evidence_type: observed
+  - step: "Inspect Google setup status."
+    url_or_control: "Google Cloud Console setup recorded in project-state verification"
+    observation: "Dedicated project and Forms API exist/enabled. Auth branding setup is unsubmitted at owner policy confirmation. No OAuth client/grant/request or Form response read."
+    evidence_type: documented
+requested_field_map:
+  - field: "name"
+    source_location: "Form question title `Tên đầy đủ`"
+    sample_evidence: "Owner inspected visible private Form question titles; API question IDs not yet observed."
+    coverage_and_confidence: "Title mapping implemented; live schema unverified."
+  - field: "email"
+    source_location: "Form question title `Email address`"
+    sample_evidence: "Owner inspected visible private Form question titles; API question IDs not yet observed."
+    coverage_and_confidence: "Title mapping implemented; live schema unverified."
+  - field: "phone"
+    source_location: "Form question title `Phone (optional)`"
+    sample_evidence: "Owner inspected visible private Form question titles; API question IDs not yet observed."
+    coverage_and_confidence: "Optional; title mapping implemented; live schema unverified."
+  - field: "service_requested"
+    source_location: "Form question title `Service requested`"
+    sample_evidence: "Owner inspected visible private Form question titles; API question IDs not yet observed."
+    coverage_and_confidence: "Title mapping implemented; live schema unverified."
+  - field: "description"
+    source_location: "Form question title `Describe your request`"
+    sample_evidence: "Owner inspected visible private Form question titles; API question IDs not yet observed."
+    coverage_and_confidence: "Title mapping implemented; live schema unverified."
+result_shape: "Forms mapper emits canonical lead with source identity `<formId>:<responseId>`; synthetic mapper-to-PostgreSQL integration verifies first store, same-event duplicate, changed-payload review, and cleanup."
+pagination_and_rendering:
+  behavior: "Inactive n8n poller uses Forms API pagination, a PostgreSQL per-source lease/checkpoint, timestamp cursor, and stable source-event storage identity."
+  coverage: "Synthetic checkpoint integration verifies lease/retry/concurrency/recovery. No live Forms pagination, API response shape, or runtime cursor behavior has been executed."
+  limits:
+    - "900-second lease expiry cannot cancel downstream work already in progress."
+    - "Google response pages and n8n Forms API HTTP failures remain live-unverified."
+    - "Source-event dedupe is not person-level, CRM, or message idempotency."
+access_and_failures:
+  auth_or_session: "Forms OAuth not configured; no grant. Local API MOCK/REAL calls also lack n8n bearer credential."
+  captcha_denial_throttle_or_robot_control: "not_applicable to the selected official API path; provider quota/rate response still needs live validation."
+  observed_errors:
+    - "No external provider error has been exercised in the poller."
+    - "Synthetic module tests cover bounded validation, unknown remote outcomes, fail-closed state, and reconciliation contracts separately."
+candidate_method:
+  name: "Official Google Forms API polling from n8n, then local workflow API"
+  rationale: "Owner-selected read-only scopes; no public callback required for the local polling workflow; reusable mapper and checkpoint modules already exist."
+  confidence: medium
+module_and_edge_implications:
+  - "Reuse source.google_forms_api_response and state.source_poll_checkpoint; keep OAuth in n8n and secrets out of exports."
+  - "Reuse lead.intake, lead.qualify, and lead.store; real model execution remains owner/rubric/budget gated."
+  - "GHL adapters are separate and require account-specific mappings before composition."
+  - "Follow-up gate and Gmail sender are separate; authoritative lifecycle events and policy must be provided."
+  - "Because the poller can commit after local storage, any added CRM/send effects need durable per-effect idempotency, retry/reconciliation and alerting before the cursor can claim full completion."
+unknowns:
+  - question: "Will the owner accept the separate Google API Services User Data Policy checkbox and configure OAuth?"
+    owner: user
+    verification_or_stop_condition: "Do not submit Google Auth branding or request consent until explicit owner confirmation; then inspect exact read-only scopes in the UI."
+  - question: "Which GHL contact/field/tag/pipeline rules should be used?"
+    owner: user
+    verification_or_stop_condition: "Wait for a GHL test Location and explicit mapping/match decisions."
+  - question: "What rubric/model budget authorizes automatic qualification?"
+    owner: user
+    verification_or_stop_condition: "No paid API call until credential, rubric, and provider-side USD cap exist."
+  - question: "What message policy, booking link, and lifecycle events govern sending?"
+    owner: user
+    verification_or_stop_condition: "No lead follow-up until content/channel/enrollment policy and stop-event sources are approved."
+stop_conditions:
+  - "OAuth consent/credential or private Form ID is not present."
+  - "Any live response includes real prospect data; stop current portfolio processing and revisit purpose/retention/access controls first."
+  - "GHL matching/pipeline rules or message permission are unspecified."
+next_owner_action: "Workflow lead may prepare the blocked-edge pipeline design; owner must resolve the listed access and business-policy decisions before live operation."
