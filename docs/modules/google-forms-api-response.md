@@ -1,6 +1,6 @@
 # Google Forms API response source (v1)
 
-Status: reusable mapper, composed lead workflow, and inactive n8n polling template implemented. Only synthetic/unit/local execution evidence exists; no OAuth consent, Form API request, response data, n8n import, or activation has been performed.
+Status: reusable mapper, composed lead workflow, and inactive n8n polling template implemented. The poller is imported into local n8n 2.41.6 and visually verified as inactive with no credential assigned. Only synthetic/unit/local API execution evidence exists; no OAuth consent, Form API request, response data, poller execution, or activation has been performed.
 
 ## Contract
 
@@ -30,7 +30,7 @@ The form ID in the workflow is a placeholder. In the current authenticated local
 
 ## Privacy, failures, and limits
 
-- Exports disable saved successful and failed execution data. A two-node manual synthetic preview was assembled and run in the authenticated n8n UI through the Docker API in `DRY_RUN`; the committed polling export remains unimported. The preview workflow now disables saved manual, successful-production, and failed-production execution data, but one earlier synthetic run remains in local n8n history. Google OAuth storage and polling pagination remain unverified. A direct host request to the n8n REST workflows endpoint returned HTTP 401 without API authentication.
+- The committed poller was imported into local n8n 2.41.6 using a temporary local workflow ID; the committed JSON was not changed. UI inspection shows its nine expected nodes and inactive state. No credentials are attached. Execution retention is disabled for manual, successful, and failed runs. A separate two-node manual synthetic preview was run through the Docker API in `DRY_RUN`; one earlier synthetic run remains in local n8n history. Google OAuth, polling pagination, and the imported poller's runtime remain unverified. A direct host request to the n8n REST workflows endpoint returned HTTP 401 without n8n API authentication.
 - Form question-title drift or duplicate titles halt mapping. A schema/response from a different Form is rejected. Do not silently rename fields in code to accommodate a changed Form; update instance config and its tests.
 - HTTP requests retry up to three times. API failures stop the execution; the cursor only changes after the whole batch has accepted storage results. A partial batch is retried from the previous cursor, so previously stored response IDs can be revisited and deduped.
 - The five-minute schedule and 20-page cap are bounded for this low-volume test Form, not capacity evidence. Large backlogs, overlapping poll executions, n8n queue/worker deployment, and Google quotas have not been tested. Static cursor state is not atomic across concurrent workflow executions.
@@ -40,5 +40,5 @@ The form ID in the workflow is a placeholder. In the current authenticated local
 
 - Unit tests cover responseId event identity, exact title-to-question-ID mapping, missing answer handling, Form mismatch, title drift/duplication, multiple/non-text answers, answer length bounds, and sanitized API results.
 - The inactive n8n export is structurally tested for read-only OAuth placeholders, bounded pagination, no saved execution data, successful-store cursor advancement, and `DRY_RUN` non-consumption.
-- The committed manual n8n preview export is synthetic and `DRY_RUN`. It has not been imported as a file; an equivalent two-node workflow was manually assembled in n8n and executed successfully through the local API.
+- The committed polling export is imported in local n8n and remains inactive. A separate committed manual preview export is synthetic and `DRY_RUN`; an equivalent two-node workflow was manually assembled in n8n and executed successfully through the local API. Neither fact establishes Google API access or poller runtime.
 - No Google API call or OAuth authorization has occurred. No actual Form response was read or stored.

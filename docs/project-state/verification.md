@@ -1,5 +1,13 @@
 ## Current release 0.10.0 — Durable lead follow-up suppression gate
 
+### n8n Forms poller import — 2026-10-03
+
+- Imported `workflows/n8n/lead-management-google-forms-api.local.json` into the existing local n8n 2.41.6 personal project using the supported `n8n import:workflow` CLI. The source export was not modified; a temporary local workflow ID was added only to the import copy because n8n's CLI requires an ID.
+- `docker compose exec -T n8n n8n export:workflow --id=P6m2Vn8Qa4Xs1Rk9 --output=/tmp/lead-forms-import-verify.json` exported the saved workflow. The sanitized local inspection confirmed 9 expected nodes, `active=false`, no node credential assigned, `saveManualExecutions=false`, and success/error execution saving set to `none`.
+- n8n UI showed **Lead Management — Google Forms API (private local)** in the Personal project and displayed the complete node graph, including the poller, Forms schema/response requests, local lead API call, and cursor advancement node.
+- This verifies successful import and visible graph state only. The poller was not executed; no Google OAuth consent/API call or response read occurred, and the placeholder Form ID is still present. The prior successful n8n UI execution belongs to the separate synthetic two-node `DRY_RUN` preview.
+- The Upwork lead-management brief remains incomplete. GHL/LLM live operations, follow-up composition and stop events, monitoring/recovery, and client acceptance remain open.
+
 - `lead.followup_gate` is registered in the module catalog and portfolio instances. It supports eligibility `check` and durable `record_event`; the lead graph and n8n export do not call it yet.
 - PostgreSQL migration 005 was applied to the existing local Compose database. The gate stores digests and enums only, requires explicit enrollment, uses stable event idempotency, and fails closed on missing/unavailable state.
 - Unit tests cover dry-run/replay blocking, strict input, hashing/no source identifier echo, blocked check, event conflict/unavailability, stop recording, and exact/stale pause resume behavior.
