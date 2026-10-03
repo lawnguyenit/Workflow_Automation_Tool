@@ -13,6 +13,7 @@
 - `docker compose config -q` passed using temporary placeholder environment values; this validates Compose syntax/interpolation only, not image pulls/builds or service startup.
 - `docker compose up --build -d` succeeded with Docker Desktop 4.70.0, Docker Engine 29.4.0, and Compose 5.1.2. The first container workflow run exposed that `fixtures/` was missing from the image; `Dockerfile` was fixed to copy it, then the image was rebuilt.
 - In the running Compose stack, PostgreSQL reported healthy, API `/healthz` returned `200`, n8n `/healthz` returned `200`, and the workflow API completed all six synthetic `DRY_RUN` steps.
+- Rechecked on 2026-10-03: `.venv\\Scripts\\python.exe -m pytest -q` returned **65 passed, 1 Starlette deprecation warning**; `docker compose ps` showed API and n8n up and PostgreSQL healthy; API and n8n `/healthz` both returned `{"status":"ok"}`.
 - Authenticated `MOCK` execution ran twice through the API and real local PostgreSQL: both workflows succeeded; the second storage result reported `duplicate=true`; PostgreSQL contained one invoice row and one notification outbox row. Slack was mocked; no external provider was called.
 - Pytest emitted one Starlette deprecation warning about its current HTTPX test-client integration; tests still passed.
 
