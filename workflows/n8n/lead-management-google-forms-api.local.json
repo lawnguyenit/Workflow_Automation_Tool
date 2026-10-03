@@ -2,43 +2,63 @@
   "name": "Lead Management — Google Forms API (private local)",
   "nodes": [
     {
-      "parameters": {"rule": {"interval": [{"field": "minutes", "minutesInterval": 5}]}},
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
       "id": "4f10b6db-2495-42d3-babb-8856d4dadf82",
       "name": "Poll every 5 minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [220, 320]
+      "position": [
+        220,
+        320
+      ]
     },
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const state = $getWorkflowStaticData('global');\nreturn [{ json: { form_id: 'REPLACE_WITH_PRIVATE_GOOGLE_FORM_ID', last_submitted_time: state.lastSubmittedTime || null, run_mode: 'DRY_RUN' } }];"
+        "jsCode": "return [{ json: { form_id: 'REPLACE_WITH_PRIVATE_GOOGLE_FORM_ID', lease_owner_id: String($execution.id || 'manual-preview'), run_mode: 'DRY_RUN' } }];"
       },
       "id": "992d61d8-045a-444b-87e4-9183aee7126a",
       "name": "Read cursor and form config",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 320]
+      "position": [
+        440,
+        460
+      ]
     },
     {
       "parameters": {
-        "url": "={{ 'https://forms.googleapis.com/v1/forms/' + $json.form_id }}",
+        "url": "={{ 'https://forms.googleapis.com/v1/forms/' + $('Read cursor and form config').first().json.form_id }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "oAuth2Api",
-        "options": {"timeout": 30000}
+        "options": {
+          "timeout": 30000
+        }
       },
       "id": "7b322dc0-b7f0-4f12-920a-8e73d91b7fb8",
       "name": "Read Form question schema",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [680, 320],
+      "position": [
+        920,
+        460
+      ],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 1000
     },
     {
       "parameters": {
-        "url": "={{ 'https://forms.googleapis.com/v1/forms/' + $('Read cursor and form config').first().json.form_id + '/responses?pageSize=500' + ($('Read cursor and form config').first().json.last_submitted_time ? '&filter=' + encodeURIComponent('timestamp >= ' + $('Read cursor and form config').first().json.last_submitted_time) : '') }}",
+        "url": "={{ 'https://forms.googleapis.com/v1/forms/' + $('Read cursor and form config').first().json.form_id + '/responses?pageSize=500' + ($('Acquire source poll lease').first().json.business_result.cursor_at ? '&filter=' + encodeURIComponent('timestamp >= ' + $('Acquire source poll lease').first().json.business_result.cursor_at) : '') }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "oAuth2Api",
         "options": {
@@ -46,7 +66,15 @@
           "pagination": {
             "pagination": {
               "paginationMode": "updateAParameterInEachRequest",
-              "parameters": {"parameters": [{"type": "qs", "name": "pageToken", "value": "={{ $response.body.nextPageToken }}"}]},
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "pageToken",
+                    "value": "={{ $response.body.nextPageToken }}"
+                  }
+                ]
+              },
               "paginationCompleteWhen": "other",
               "completeExpression": "={{ !$response.body.nextPageToken }}",
               "limitPagesFetched": true,
@@ -60,7 +88,10 @@
       "name": "List Form responses",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [920, 320],
+      "position": [
+        1160,
+        460
+      ],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 1000
@@ -68,19 +99,38 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const pages = $input.all().map(item => item.json);\nif (!pages.length) return [{ json: { no_responses: true } }];\nconst finalPage = pages[pages.length - 1];\nif (finalPage.nextPageToken) throw new Error('Google Forms response page cap reached; cursor was not advanced. Increase the bounded page cap or reconcile backlog.');\nconst responses = pages.flatMap(page => Array.isArray(page.responses) ? page.responses : []);\nif (!responses.length) return [{ json: { no_responses: true } }];\nconst form = $('Read Form question schema').first().json;\nconst config = $('Read cursor and form config').first().json;\nreturn responses.map(response => {\n  const rawTime = response.lastSubmittedTime || response.createTime;\n  const milliseconds = Date.parse(rawTime || '');\n  if (!response.responseId || !Number.isFinite(milliseconds)) throw new Error('Form response is missing a stable responseId or valid timestamp.');\n  return { json: { form_id: config.form_id, form, response, response_time_ms: milliseconds, run_mode: config.run_mode } };\n});"
+        "jsCode": "const pages = $('List Form responses').all().map(item => item.json);\nif (!pages.length) return [{ json: { no_responses: true } }];\nconst finalPage = pages[pages.length - 1];\nif (finalPage.nextPageToken) throw new Error('Google Forms response page cap reached; cursor was not advanced. Increase the bounded page cap or reconcile backlog.');\nconst responses = pages.flatMap(page => Array.isArray(page.responses) ? page.responses : []);\nif (!responses.length) return [{ json: { no_responses: true } }];\nconst form = $('Read Form question schema').first().json;\nconst config = $('Read cursor and form config').first().json;\nreturn responses.map(response => {\n  const rawTime = response.lastSubmittedTime || response.createTime;\n  const milliseconds = Date.parse(rawTime || '');\n  if (!response.responseId || !Number.isFinite(milliseconds)) throw new Error('Form response is missing a stable responseId or valid timestamp.');\n  return { json: { form_id: config.form_id, form, response, response_time_ms: milliseconds, run_mode: config.run_mode } };\n});"
       },
       "id": "3f5056c6-6951-420e-83b7-27f636a06ed8",
       "name": "Prepare response events",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1160, 320]
+      "position": [
+        1840,
+        460
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
-          "conditions": [{"id": "4dd8e945-7ce9-4cfd-b72e-eae1f9206752", "leftValue": "={{ $json.no_responses === true }}", "rightValue": true, "operator": {"type": "boolean", "operation": "true", "singleValue": true}}],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4dd8e945-7ce9-4cfd-b72e-eae1f9206752",
+              "leftValue": "={{ $json.no_responses === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
           "combinator": "and"
         },
         "options": {}
@@ -89,7 +139,10 @@
       "name": "No new responses?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [1380, 320]
+      "position": [
+        2060,
+        460
+      ]
     },
     {
       "parameters": {},
@@ -97,7 +150,10 @@
       "name": "No new responses",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [1600, 180]
+      "position": [
+        2500,
+        200
+      ]
     },
     {
       "parameters": {
@@ -106,13 +162,18 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { payload: { form_id: $json.form_id, form: $json.form, response: $json.response }, context: { workflow_id: 'lead_management_google_forms_api', attempt: 1, mode: $json.run_mode } } }}",
-        "options": {"timeout": 30000}
+        "options": {
+          "timeout": 30000
+        }
       },
       "id": "67198120-7eb0-4b85-8cd1-68a0748e3f64",
       "name": "Run local lead workflow",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1600, 460],
+      "position": [
+        2280,
+        620
+      ],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 1000
@@ -120,26 +181,440 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const results = $input.all().map(item => item.json);\nconst sourceEvents = $('Prepare response events').all().map(item => item.json);\nif (results.length !== sourceEvents.length) throw new Error('Not every fetched response has a workflow result; cursor remains unchanged.');\nfor (const result of results) {\n  const state = result?.steps?.store?.business_result?.state;\n  if (!['STORED', 'DUPLICATE', 'PREVIEWED'].includes(state)) throw new Error('At least one response did not reach an accepted storage state; cursor remains unchanged.');\n}\nconst mode = $('Read cursor and form config').first().json.run_mode;\nif (mode !== 'MOCK' && mode !== 'REAL') return [{ json: { cursor_advanced: false, reason: 'DRY_RUN does not consume source responses' } }];\nconst maxMilliseconds = Math.max(...sourceEvents.map(event => event.response_time_ms));\nconst state = $getWorkflowStaticData('global');\nconst previous = Date.parse(state.lastSubmittedTime || '') || 0;\nstate.lastSubmittedTime = new Date(Math.max(previous, maxMilliseconds)).toISOString();\nreturn [{ json: { cursor_advanced: true, last_submitted_time: state.lastSubmittedTime, processed: results.length } }];"
+        "jsCode": "const results = $input.all().map(item => item.json);\\nconst sourceEvents = $('Prepare response events').all().map(item => item.json);\\nif (results.length !== sourceEvents.length) throw new Error('Not every fetched response has a workflow result; cursor remains unchanged.');\\nfor (const result of results) {\\n  const state = result?.steps?.store?.business_result?.state;\\n  if (!['STORED', 'DUPLICATE', 'PREVIEWED'].includes(state)) throw new Error('At least one response did not reach an accepted storage state; cursor remains unchanged.');\\n}\\nconst maxMilliseconds = Math.max(...sourceEvents.map(event => event.response_time_ms));\\nconst acquired = $('Acquire source poll lease').first().json.business_result;\\nconst config = $('Read cursor and form config').first().json;\\nreturn [{ json: { payload: { operation: 'commit', checkpoint_key: config.form_id, lease_owner_id: config.lease_owner_id, lease_token: acquired.lease_token || '00000000-0000-4000-8000-000000000000', cursor_at: new Date(maxMilliseconds).toISOString() }, context: { workflow_id: 'google_forms_poll', attempt: 1, mode: config.run_mode } } }];"
       },
       "id": "9b3a9467-04ae-4118-9130-cc32783506de",
-      "name": "Advance cursor after successful storage",
+      "name": "Prepare checkpoint commit",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1840, 460]
+      "position": [
+        2500,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/v1/instances/portfolio.google_forms_poll_checkpoint/runs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { payload: { operation: 'acquire', checkpoint_key: $('Read cursor and form config').first().json.form_id, lease_owner_id: $('Read cursor and form config').first().json.lease_owner_id }, context: { workflow_id: 'google_forms_poll', attempt: 1, mode: $('Read cursor and form config').first().json.run_mode } } }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "be96ebd4-a359-4828-9ac3-5ff10bafcc01",
+      "name": "Acquire source poll lease",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        460
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 500
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "dc7785e5-baa1-4ab6-9a47-3ea47606c4de",
+              "leftValue": "={{ ['ACQUIRED', 'PREVIEWED'].includes($json.business_result?.state) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9ec2fc69-6c29-4e6d-af12-1a1c5364f7c0",
+      "name": "Lease acquired?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        460
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a98081e5-31d4-46c3-b986-d5c215abf60f",
+      "name": "Another poll owns this Form",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        920,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/v1/instances/portfolio.google_forms_poll_checkpoint/runs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { payload: { operation: 'release', checkpoint_key: $('Read cursor and form config').first().json.form_id, lease_owner_id: $('Read cursor and form config').first().json.lease_owner_id, lease_token: $('Acquire source poll lease').first().json.business_result.lease_token || '00000000-0000-4000-8000-000000000000' }, context: { workflow_id: 'google_forms_poll', attempt: 1, mode: $('Read cursor and form config').first().json.run_mode } } }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "a933ad46-3c40-4f13-a85c-5ea153a0f13a",
+      "name": "Release lease after empty poll",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2280,
+        200
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 500
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/v1/instances/portfolio.google_forms_poll_checkpoint/runs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { payload: $json.payload, context: $json.context } }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "d2e2626e-3952-4a13-ae44-07a3d8bc058c",
+      "name": "Commit source checkpoint",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2720,
+        620
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 500
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b46fcaa1-748e-4820-bd30-a9316b8936d9",
+              "leftValue": "={{ ['COMMITTED', 'PREVIEWED'].includes($json.business_result?.state) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a24c9b3e-c4f5-46ed-94e3-235e1a123994",
+      "name": "Checkpoint committed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2940,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "errorMessage": "The source checkpoint lease was lost; stored event IDs are safe to replay."
+      },
+      "id": "37003da4-7543-4d87-95dd-4467c915bdbb",
+      "name": "Stop on lost checkpoint lease",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        3160,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/v1/instances/portfolio.google_forms_poll_checkpoint/runs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { payload: { operation: 'renew', checkpoint_key: $('Read cursor and form config').first().json.form_id, lease_owner_id: $('Read cursor and form config').first().json.lease_owner_id, lease_token: $('Acquire source poll lease').first().json.business_result.lease_token || '00000000-0000-4000-8000-000000000000' }, context: { workflow_id: 'google_forms_poll', attempt: 1, mode: $('Read cursor and form config').first().json.run_mode } } }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "ba25db2e-19a8-4c4b-9bda-2a2af2cf8761",
+      "name": "Renew source poll lease",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        460
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 500
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9f09c77f-77e6-408d-ac66-16b1de34e922",
+              "leftValue": "={{ ['RENEWED', 'PREVIEWED'].includes($json.business_result?.state) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b9bc979d-6b97-4d67-9bd7-7d942b84978c",
+      "name": "Lease renewed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1620,
+        460
+      ]
     }
   ],
   "connections": {
-    "Poll every 5 minutes": {"main": [[{"node": "Read cursor and form config", "type": "main", "index": 0}]]},
-    "Read cursor and form config": {"main": [[{"node": "Read Form question schema", "type": "main", "index": 0}]]},
-    "Read Form question schema": {"main": [[{"node": "List Form responses", "type": "main", "index": 0}]]},
-    "List Form responses": {"main": [[{"node": "Prepare response events", "type": "main", "index": 0}]]},
-    "Prepare response events": {"main": [[{"node": "No new responses?", "type": "main", "index": 0}]]},
-    "No new responses?": {"main": [[{"node": "No new responses", "type": "main", "index": 0}], [{"node": "Run local lead workflow", "type": "main", "index": 0}]]},
-    "Run local lead workflow": {"main": [[{"node": "Advance cursor after successful storage", "type": "main", "index": 0}]]}
+    "Poll every 5 minutes": {
+      "main": [
+        [
+          {
+            "node": "Read cursor and form config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read cursor and form config": {
+      "main": [
+        [
+          {
+            "node": "Acquire source poll lease",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acquire source poll lease": {
+      "main": [
+        [
+          {
+            "node": "Lease acquired?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lease acquired?": {
+      "main": [
+        [
+          {
+            "node": "Read Form question schema",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Another poll owns this Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Form question schema": {
+      "main": [
+        [
+          {
+            "node": "List Form responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Form responses": {
+      "main": [
+        [
+          {
+            "node": "Renew source poll lease",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare response events": {
+      "main": [
+        [
+          {
+            "node": "No new responses?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No new responses?": {
+      "main": [
+        [
+          {
+            "node": "Release lease after empty poll",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Run local lead workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Release lease after empty poll": {
+      "main": [
+        [
+          {
+            "node": "No new responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run local lead workflow": {
+      "main": [
+        [
+          {
+            "node": "Prepare checkpoint commit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare checkpoint commit": {
+      "main": [
+        [
+          {
+            "node": "Commit source checkpoint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Commit source checkpoint": {
+      "main": [
+        [
+          {
+            "node": "Checkpoint committed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checkpoint committed?": {
+      "main": [
+        [
+          {
+            "node": "No new responses",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop on lost checkpoint lease",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Renew source poll lease": {
+      "main": [
+        [
+          {
+            "node": "Lease renewed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lease renewed?": {
+      "main": [
+        [
+          {
+            "node": "Prepare response events",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop on lost checkpoint lease",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
   "active": false,
-  "settings": {"executionOrder": "v1", "saveDataErrorExecution": "none", "saveDataSuccessExecution": "none", "saveManualExecutions": false},
-  "meta": {"templateCredsSetupCompleted": false},
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
   "tags": []
 }

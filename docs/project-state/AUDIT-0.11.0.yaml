@@ -1,0 +1,211 @@
+audit_id: AUDIT-0.11.0
+date: 2026-10-03
+status: FAILED_AUDIT
+scope:
+  target: "Supplied Upwork lead-management brief, selected read-only Google Forms API source, and release 0.11.0 PostgreSQL polling checkpoint."
+  auditor: "Separate deliverable-auditor agent; workflow lead recorded the independent findings and performed follow-up correction checks."
+  evidence_policy: >-
+    The auditor independently inspected current source, contracts, test and integration
+    artifacts, Docker health/API metadata, and the persisted n8n workflow UI. The auditor
+    did not modify files, rerun tests/integration, call Google or other external providers,
+    or claim user acceptance. The workflow lead subsequently reran the full local suite,
+    applied migration 006, verified the corrected schema on both the existing database
+    and a fresh temporary database, and confirmed synthetic-row cleanup. No provider
+    credential, live source response, or client data was used.
+summary: >-
+  The new source-poll checkpoint meets its bounded local contract: hashed source key,
+  fenced PostgreSQL lease, renewal, monotonic timestamp commit, stale-run rejection,
+  and retry-safe latest commit/release results. Its unit/API and synthetic Compose/PostgreSQL
+  checks pass, and the revised 18-node n8n poller is imported inactive with no credential
+  or static cursor. This does not establish Forms API access or poller execution. The
+  n8n nodes do not carry the configured local API bearer credential required for MOCK/REAL.
+  The full Upwork business flow remains incomplete: no live Google source, model call,
+  GHL account/write, composed follow-up/suppression, end-to-end alert/recovery, handover,
+  or user acceptance.
+module_assessment:
+  source_poll_checkpoint: "PASS, bounded: source reviewed; 185-test suite and synthetic PostgreSQL concurrency/recovery harness passed; live n8n caller not exercised."
+  forms_api_source: "Inactive placeholder-based poller structurally verified in n8n; OAuth and Forms API runtime not tested."
+  lead_intake_and_storage: "Local synthetic composition exists; source event dedupe does not prove person-level or downstream side-effect dedupe."
+  qualification: "Fail-closed review path and module exist; no approved rubric, OpenAI API account/key, spend budget, or live model result."
+  ghl_adapters: "Separate reusable adapters have synthetic checks; no GHL account/Location, mappings, credentials, or composed lead edge."
+  followup_gate: "Standalone suppression module; no actual event producers, scheduler, sender, or connected pre-send gate."
+  full_job: "FAIL / incomplete."
+criterion_matrix:
+  - criterion: "Capture enquiry from one configured live form/webhook"
+    result: "not_tested"
+    evidence: "Google Forms workflow remains inactive with placeholder Form ID and no OAuth; private Form is unpublished and the auditor found zero poller executions."
+    limitation: "No Google Forms API request or real response was read."
+    owner_next_action: "Owner configures a Google Cloud OAuth app and read-only n8n credential after choosing the Cloud setup path, then runs an owner-observed synthetic response."
+  - criterion: "Validate required fields and normalize contact information"
+    result: "pass"
+    evidence: "Forms mapper → lead intake → qualification/review → PostgreSQL composition exists; prior audit and current unit/API suite cover bounded normalization and missing/invalid-field review."
+    limitation: "No live Form schema or respondent data was tested; phone country/E.164 assumptions are not invented."
+    owner_next_action: "Reconfirm field mappings against the live Forms API schema once OAuth is configured."
+  - criterion: "Prevent duplicate submissions and CRM records/messages"
+    result: "risk"
+    evidence: "Stable formId:responseId storage key and the source-poll lease support replay safety for the current PostgreSQL-only graph; integration harness reports STORED/DUPLICATE/conflict outcomes."
+    limitation: "This does not establish same-person dedupe or exactly-once GHL/opportunity/message effects; downstream adapters remain uncomposed."
+    owner_next_action: "Keep each future remote write behind its own durable idempotency and unknown-outcome reconciliation contract."
+  - criterion: "AI extraction, summary, and classification; missing data flagged"
+    result: "not_tested"
+    evidence: "Qualification module and manual-review fallback exist."
+    limitation: "No client-approved rubric, OpenAI API credential, monetary limit, or live model result."
+    owner_next_action: "Owner supplies rubric, acceptable labels, privacy decision, API credential, and provider-side spend cap before live calls."
+  - criterion: "Create/update GHL contacts, custom fields, tags, and opportunities"
+    result: "decision_needed"
+    evidence: "Contact/tag/opportunity adapters exist independently with synthetic tests."
+    limitation: "No GHL account/Location, OAuth/token scopes, matching policy, approved custom fields/tags, pipeline/stage IDs, or composed CRM edge."
+    owner_next_action: "Owner provisions a test Location and approves mappings and duplicate/opportunity rules."
+  - criterion: "Send approved acknowledgement/follow-up and stop on reply/book/opt-out/pause"
+    result: "not_tested"
+    evidence: "A standalone suppression gate and separate Gmail sender module exist."
+    limitation: "No enrollment/content/timing policy, booking link, authoritative stop-event producers, sender credential, or pre-send composition."
+    owner_next_action: "Owner approves message and enrollment policy, sender/channel, booking target, and lifecycle event sources; compose and exercise the gate before every send."
+  - criterion: "Monitoring, bounded retry, alerts, failure recovery, and operator resolution"
+    result: "fail"
+    evidence: "Modules expose selected retry, fail-closed, and unknown-outcome states; the checkpoint bounds database waits and prevents stale cursor commits."
+    limitation: "No lead-level alert, dead-letter/replay operator path, recovery owner, or end-to-end failure-and-recovery run."
+    owner_next_action: "Choose an alert destination and recovery owner; compose and exercise alert, reconciliation, and safe replay."
+  - criterion: "Export workflow without secrets, setup guide, and handover"
+    result: "risk"
+    evidence: "Committed source/module exports and setup documentation exist; revised n8n graph is inactive, placeholder-based, and credential-free."
+    limitation: "No complete CRM/follow-up export or recorded client handover; n8n API bearer and Google OAuth have not been configured on the workflow."
+    owner_next_action: "Complete owner-controlled credentials and mappings, then produce final secret-free exports and handover materials."
+  - criterion: "Successful enquiry moves through qualification, CRM, and the correct follow-up"
+    result: "fail"
+    evidence: "The local lead graph ends at PostgreSQL; separate synthetic preview and database integration do not demonstrate one live business run."
+    limitation: "No end-to-end source → model → GHL → follow-up run."
+    owner_next_action: "Complete required account setup/composition, then run the agreed synthetic acceptance matrix."
+  - criterion: "User acceptance"
+    result: "decision_needed"
+    evidence: "No acceptance decision for a full-scope workflow has been recorded."
+    limitation: "The delivered local checkpoint/export is an implementation increment, not the full Upwork outcome."
+    owner_next_action: "User reviews a complete, evidence-backed end-to-end result when all client-owned inputs are available."
+modules:
+  - id: "state.source_poll_checkpoint"
+    result: "pass"
+    evidence:
+      - "src/workflow_automation/modules/processing/source_poll_checkpoint.py"
+      - "src/workflow_automation/infrastructure/postgres_source_poll_checkpoint.py"
+      - "infra/postgres/migrations/006-source-poll-checkpoint.sql"
+      - "tests/unit/test_source_poll_checkpoint.py"
+      - "tests/integration/source_poll_checkpoint_postgres.py"
+      - "docs/project-state/verification.md"
+    limits:
+      - "Checkpoint coordinates one source key and timestamps; opaque page tokens require another contract."
+      - "Lease expiry can permit already-started downstream work to continue; fencing only prevents stale cursor commit."
+      - "Future remote side effects still require independent idempotency and reconciliation."
+  - id: "source.google_forms_api_response"
+    result: "risk"
+    evidence:
+      - "workflows/n8n/lead-management-google-forms-api.local.json"
+      - "tests/unit/test_google_forms_api_n8n_export.py"
+      - "docs/modules/google-forms-api-response.md"
+    limits:
+      - "Import inspection is not execution; OAuth, Forms pagination/filter, question IDs, and response mapping in n8n remain untested live."
+      - "The configured local API bearer is not attached to MOCK/REAL HTTP calls, so those modes cannot pass current API authorization until wired."
+composition_edges:
+  - edge: "Forms poller → source-poll checkpoint acquire/renew/release/commit"
+    result: "risk"
+    evidence: "Static graph and export tests show connected nodes; persisted n8n graph contains 18 nodes and is inactive."
+    limitation: "No execution tested credential propagation, HTTP response shapes, or lease state branches."
+  - edge: "Forms response → lead mapper/intake/qualification/store"
+    result: "risk"
+    evidence: "Synthetic Python/API/PostgreSQL integration is reported and source event dedupe is bounded."
+    limitation: "No Google response passed through this edge; current n8n API calls lack bearer auth for database-writing modes."
+  - edge: "Lead qualification → GHL contact/opportunity → follow-up sender/suppression gate"
+    result: "fail"
+    evidence: "The relevant adapters and gate are separate and no approved composed graph exists."
+    limitation: "No client-owned mappings, event sources, policy, or accounts."
+end_to_end:
+  result: "fail"
+  evidence:
+    - "Full automated suite: 185 passed, one existing Starlette/httpx deprecation warning."
+    - "Checkpoint Compose/PostgreSQL integration passed synthetic concurrency/recovery cases and removed all test rows."
+    - "Docker API 0.11.0 health and catalog expose the checkpoint module/instance."
+    - "Persisted n8n workflow is an inactive credential-free 18-node graph; no poller execution exists."
+  limits:
+    - "No live Google Forms, model, CRM, or sender call."
+    - "No alert/recovery or client handover acceptance."
+findings:
+  - id: AUD-01101
+    severity: high
+    disposition: open
+    title: "The full business outcome is not composed or demonstrated."
+    evidence:
+      - "Current lead graph ends at PostgreSQL; GHL and follow-up components remain separate."
+      - "No live end-to-end source → qualification → CRM → follow-up run or user acceptance."
+    impact: "The Upwork acceptance criterion remains unmet."
+    next_gate: "Obtain required account access and business rules, compose the graph, and exercise the agreed acceptance matrix."
+  - id: AUD-01102
+    severity: high
+    disposition: configuration_needed
+    title: "Forms poller is inactive and lacks required credentials."
+    evidence:
+      - "n8n persisted workflow is inactive and has no credentials; Google Form ID remains a placeholder."
+      - "The local API has WORKFLOW_API_KEY configured, but exported n8n HTTP nodes contain no API bearer credential for MOCK/REAL."
+      - "Selected Cloud project has not been configured for Forms API OAuth; no OAuth credential exists in n8n."
+    impact: "The poller cannot read Forms, and database-writing modes will fail API authorization until owner-controlled credentials are configured."
+    next_gate: "Owner selects Cloud project path, completes read-only OAuth, enters the Form ID locally, and creates/assigns a protected API bearer credential; then run only synthetic test data."
+  - id: AUD-01103
+    severity: high
+    disposition: open
+    title: "Follow-up stop gate and sender are not connected to authoritative events."
+    evidence:
+      - "The standalone gate does not produce reply/booking/opt-out events or send messages."
+      - "No connected sender checks gate state immediately before dispatch."
+    impact: "Duplicate or disallowed follow-ups have not been prevented in an actual message path."
+    next_gate: "Approve enrollment/content and lifecycle event sources, then compose and test a fail-closed pre-send gate."
+  - id: AUD-01104
+    severity: high
+    disposition: open
+    title: "Lead-level alerting and operator recovery remain incomplete."
+    evidence:
+      - "No lead alert destination, dead-letter path, recovery owner, or failure-and-replay exercise is verified."
+    impact: "A safely stopped execution may still remain unnoticed or unrecoverable by the operator."
+    next_gate: "Choose owner/destination and implement alert, reconciliation, and safe replay steps."
+  - id: AUD-01105
+    severity: medium
+    disposition: documented_risk
+    title: "Lease expiry and timestamp polling are bounded, not exactly-once."
+    evidence:
+      - "Checkpoint fencing blocks stale commits; it cannot cancel downstream work already in progress."
+      - "The 900-second lease renews after page retrieval, not during a long per-response batch."
+      - "Inclusive timestamp polling can replay equal-timestamp events; storage event identity is the safety boundary."
+    impact: "Long runs may replay work, so later remote side effects need independent idempotency and reconciliation."
+    next_gate: "Keep the low-volume bound; before scale-up, measure batch duration, renew during processing if needed, and verify each side-effect guard."
+  - id: AUD-01106
+    severity: medium
+    disposition: open
+    title: "Follow-up HMAC key rotation/loss still lacks recovery tooling."
+    evidence:
+      - "The standalone gate stores HMAC-derived identities and has no key migration tool; earlier audit AUD-0104 identifies the same risk."
+    impact: "Lost/rotated key can make prior suppression state unreachable and permit an unsafe re-enrollment without reconciliation."
+    next_gate: "Define key custody/backup and controlled migration or disable sending until manual state reconciliation."
+post_audit_corrections:
+  - item: "Fresh-init last_action CHECK constraint was weaker than migration 006."
+    state: "resolved and verified after independent audit"
+    evidence:
+      - "infra/postgres/init.sql and infra/postgres/migrations/006-source-poll-checkpoint.sql now enforce the same COMMITTED/RELEASED values."
+      - "Migration 006 reapplied successfully; pg_get_constraintdef confirmed the allowed states."
+      - "A fresh temporary database initialized with init.sql showed the same CHECK; it was dropped after verification."
+open_client_inputs:
+  - "Owner choice of Google Cloud OAuth setup path; read-only Forms OAuth consent and private Form ID for local n8n only."
+  - "Protected API bearer credential assignment for n8n MOCK/REAL calls."
+  - "GHL test account/Location, token/scopes, contact match policy, custom fields/tags, pipeline/stage and opportunity rules."
+  - "Approved qualification rubric/model, privacy decision, provider-side spend cap."
+  - "Approved follow-up copy/channel/timing/booking link/enrollment policy and authoritative stop-event sources."
+  - "Alert destination and named recovery owner; final user acceptance."
+verification_record:
+  independent_auditor_actions:
+    - "Inspected current source/contracts/export/project state and prior audits; queried local API health and version; opened the persisted n8n workflow UI and found zero poller executions."
+    - "Did not modify files, rerun tests/integration harnesses, call external providers, or claim user acceptance."
+  workflow_lead_follow_up:
+    - "Ran uv run pytest -q: 185 passed, one existing Starlette/httpx deprecation warning."
+    - "Ran uv lock --check, python -m compileall -q src tests, and git diff --check successfully."
+    - "Applied migration 006 again; synthetic Compose/PostgreSQL integration passed and removed its rows (count 0)."
+    - "Initialized a fresh temporary database from init.sql; verified matching CHECK constraint and dropped the database."
+    - "Rebuilt API 0.11.0; /healthz returned ok and /v1/catalog contains the checkpoint module and instance."
+    - "Re-imported the revised workflow in place and exported it: 18 nodes, inactive, no credentials, no static cursor."
+    - "Did not execute the poller or make any external provider request."
+recommendation: "FAILED_AUDIT"

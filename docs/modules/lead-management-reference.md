@@ -6,6 +6,7 @@ This is a private, synthetic/local reference workflow inspired by the supplied U
 
 ```text
 Google Forms API polling (read-only schema + response scopes; inactive template)
+  → state.source_poll_checkpoint: acquire/renew lease and commit UTC timestamp only after accepted storage
   → source.google_forms_api_response: map one response by exact question title/ID and responseId
   → lead.intake: trim, normalize email/phone, enforce bounded field sizes,
     flag missing/invalid fields and fingerprint payload
@@ -43,7 +44,7 @@ The reusable `crm.ghl_upsert_contact`, `crm.ghl_contact_tags`, and `crm.ghl_upse
 - Intake module responses expose the review status/reasons but suppress name, email, phone, and enquiry text. The database retains the input record and therefore still requires access controls and synthetic-only use for this reference.
 - No reply/book/opt-out/manual-pause event source or follow-up suppression scheduler is wired.
 - The Google Form is unpublished; the imported Forms API poller is inactive, has a placeholder Form ID and no credential, and defaults to `DRY_RUN`. Its question mapping has not been checked against the live Forms API schema. The separate local synthetic preview was run, but the poller itself was not executed. The prior Sheets export remains optional. The local services bind only to loopback. No external endpoint is exposed. The user's VPS is explicitly out of scope.
-- The polling cursor is n8n workflow static data. It is a single-instance, low-volume reference only: overlapping runs are not serialized and the cursor is not a distributed checkpoint. Partial batches keep the prior cursor and revisit earlier response IDs; PostgreSQL suppresses same-event replays and flags changed payloads for review. Production multi-worker/high-volume use needs an atomic database checkpoint or lease first.
+- The committed Forms API n8n export and local imported workflow use `state.source_poll_checkpoint` with a PostgreSQL lease, renewal, monotonic timestamp commit, and stale-token fencing. The revised graph was re-imported and verified inactive with no credentials. It has not been executed; Google OAuth and an API bearer credential for `MOCK`/`REAL` remain unconfigured. The database lease serializes one source key, but an expired execution may finish downstream work; current PostgreSQL lead-event storage is idempotent, and any future GHL/email side effects still need their own effect guards.
 - This does not establish privacy/legal readiness for real prospect data. Keep current runs synthetic.
 
 ## Module boundaries

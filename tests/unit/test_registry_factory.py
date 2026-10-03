@@ -105,3 +105,14 @@ def test_followup_gate_is_a_reusable_fail_closed_module_instance():
         ExecutionContext(workflow_id="followup_test", mode=RunMode.DRY_RUN),
     )
     assert preview.business_result["can_send"] is False
+
+
+def test_source_poll_checkpoint_instance_uses_postgres_and_has_bounded_lease():
+    from workflow_automation.modules.processing.source_poll_checkpoint import SourcePollCheckpoint
+
+    registry = build_registry()
+    instance = registry.instances["portfolio.google_forms_poll_checkpoint"]
+    module = registry.instance_modules[instance.instance_id]
+    assert instance.module == "state.source_poll_checkpoint"
+    assert isinstance(module, SourcePollCheckpoint)
+    assert module._lease_seconds == 900

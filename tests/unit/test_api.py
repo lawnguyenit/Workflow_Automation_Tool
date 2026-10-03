@@ -11,8 +11,21 @@ def test_catalog_and_health_are_available():
         "email.ingest", "document.extract", "llm.structured_extract", "data.validate",
         "storage.record", "notify.send", "gmail.send", "lead.intake", "lead.store",
         "lead.qualify", "source.google_form_response", "source.google_forms_api_response",
-        "crm.ghl_upsert_contact",
+        "state.source_poll_checkpoint", "crm.ghl_upsert_contact",
         "crm.ghl_upsert_opportunity", "crm.ghl_contact_tags", "lead.followup_gate",
+    }
+
+
+def test_poll_checkpoint_module_is_previewable_without_database_state():
+    client = TestClient(create_app())
+    response = client.post("/v1/instances/portfolio.google_forms_poll_checkpoint/runs", json={
+        "payload": {"operation": "acquire", "checkpoint_key": "synthetic-form",
+                    "lease_owner_id": "synthetic-run-1"},
+    })
+    assert response.status_code == 200
+    assert response.json()["business_result"] == {
+        "state": "PREVIEWED", "cursor_at": None, "lease_token": None,
+        "lease_expires_at": None,
     }
 
 

@@ -7,7 +7,7 @@ POLLING_EXPORT = ROOT / "workflows" / "n8n" / "lead-management-google-forms-api.
 MANUAL_EXPORT = ROOT / "workflows" / "n8n" / "lead-management-google-forms-api.manual-preview.json"
 
 
-def test_polling_export_is_inactive_read_only_paginated_and_checkpointed_after_success():
+def test_polling_export_is_inactive_read_only_paginated_and_lease_checkpointed_after_success():
     workflow = json.loads(POLLING_EXPORT.read_text(encoding="utf-8"))
     nodes = {node["name"]: node for node in workflow["nodes"]}
     assert workflow["active"] is False
@@ -16,6 +16,7 @@ def test_polling_export_is_inactive_read_only_paginated_and_checkpointed_after_s
     assert workflow["settings"]["saveManualExecutions"] is False
     assert "credentials" not in json.dumps(workflow)
     assert "REPLACE_WITH_PRIVATE_GOOGLE_FORM_ID" in nodes["Read cursor and form config"]["parameters"]["jsCode"]
+    assert "$getWorkflowStaticData" not in json.dumps(workflow)
     assert "forms.googleapis.com/v1/forms/" in nodes["Read Form question schema"]["parameters"]["url"]
     assert "genericAuthType" in nodes["Read Form question schema"]["parameters"]
     pagination = nodes["List Form responses"]["parameters"]["options"]["pagination"]["pagination"]
@@ -25,11 +26,16 @@ def test_polling_export_is_inactive_read_only_paginated_and_checkpointed_after_s
     map_code = nodes["Prepare response events"]["parameters"]["jsCode"]
     assert "finalPage.nextPageToken" in map_code
     assert "response.responseId" in map_code
-    cursor_code = nodes["Advance cursor after successful storage"]["parameters"]["jsCode"]
+    cursor_code = nodes["Prepare checkpoint commit"]["parameters"]["jsCode"]
     assert "['STORED', 'DUPLICATE', 'PREVIEWED']" in cursor_code
-    assert "mode !== 'MOCK' && mode !== 'REAL'" in cursor_code
-    assert "state.lastSubmittedTime" in cursor_code
-    assert workflow["connections"]["Run local lead workflow"]["main"][0][0]["node"] == "Advance cursor after successful storage"
+    assert "operation: 'commit'" in cursor_code
+    assert workflow["connections"]["Run local lead workflow"]["main"][0][0]["node"] == "Prepare checkpoint commit"
+    assert workflow["connections"]["Prepare checkpoint commit"]["main"][0][0]["node"] == "Commit source checkpoint"
+    assert workflow["connections"]["Commit source checkpoint"]["main"][0][0]["node"] == "Checkpoint committed?"
+    assert workflow["connections"]["Lease acquired?"]["main"][1][0]["node"] == "Another poll owns this Form"
+    assert workflow["connections"]["List Form responses"]["main"][0][0]["node"] == "Renew source poll lease"
+    assert workflow["connections"]["Lease renewed?"]["main"][1][0]["node"] == "Stop on lost checkpoint lease"
+    assert "operation: 'renew'" in nodes["Renew source poll lease"]["parameters"]["jsonBody"]
 
 
 def test_manual_forms_api_preview_is_synthetic_and_does_not_need_google_oauth():

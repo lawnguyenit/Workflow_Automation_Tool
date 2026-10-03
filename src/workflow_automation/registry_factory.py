@@ -19,6 +19,7 @@ from workflow_automation.definitions import (
 from workflow_automation.executors import PythonExecutor
 from workflow_automation.infrastructure.postgres_effect_guard import PostgresExternalEffectGuard
 from workflow_automation.infrastructure.postgres_lead_qualification_ledger import PostgresLeadQualificationLedger
+from workflow_automation.infrastructure.postgres_source_poll_checkpoint import PostgresSourcePollCheckpoint
 from workflow_automation.models import ModuleInstance
 from workflow_automation.modules.crm.ghl_upsert_contact import GHLUpsertContact
 from workflow_automation.modules.crm.ghl_upsert_opportunity import GHLUpsertOpportunity
@@ -31,6 +32,7 @@ from workflow_automation.modules.output.gmail_send import GmailSend
 from workflow_automation.modules.processing.lead_intake import LeadIntake
 from workflow_automation.modules.processing.lead_qualify import LeadQualify
 from workflow_automation.modules.processing.lead_followup_gate import LeadFollowupGate
+from workflow_automation.modules.processing.source_poll_checkpoint import SourcePollCheckpoint
 from workflow_automation.modules.processing.document_extract import DocumentExtract
 from workflow_automation.modules.processing.llm_structured_extract import LLMStructuredExtract
 from workflow_automation.modules.processing.validate import Validate
@@ -102,6 +104,11 @@ def build_registry(additional_module_instances=None) -> FrameworkRegistry:
             module = GoogleFormsApiResponse(
                 source_account=config.get("source_account", "portfolio-lead-form"),
                 field_titles=config.get("field_titles"),
+            )
+        elif item.module == "state.source_poll_checkpoint":
+            module = SourcePollCheckpoint(
+                store=PostgresSourcePollCheckpoint(),
+                lease_seconds=config.get("lease_seconds", 900),
             )
         elif item.module == "document.extract":
             module = DocumentExtract(
