@@ -1,6 +1,6 @@
 # Workflow Automation Framework — Implementation Plan
 
-**Status:** Approved reference implementation completed locally; user review pending (2026-10-03).
+**Status:** Initial document-intake reference is implemented; the next lead-management reference instance is approved and in intake, with real account inventory pending (2026-10-03).
 **Purpose:** Build a reusable automation framework first, then use the same framework to create concrete, production-style workflow instances for portfolio and future freelance jobs.
 
 ## Execution tracker
@@ -12,7 +12,23 @@
 | 3. End-to-end portfolio workflow | Implemented; local dry-run verified | LLM extraction, validation, PostgreSQL preview, outbox/Slack output and API/n8n entry point are connected. |
 | 4. Safe-debug infrastructure | Implemented; local behavior verified | Synthetic fixtures, mocked provider tests, DRY_RUN/MOCK/REPLAY/REAL modes, correlation context, sanitized errors/API response, and recovery statuses. |
 | 5. Reliability hardening | Implemented partially; scoped checks verified | Source-key conflict behavior, conditional outbox claim, timeout ambiguity, limits, and mock failure cases are covered. Live database races, capacity/load, provider rate limits, queues/backpressure, and production observability remain untested or not implemented. |
-| 6–7. Demand-driven catalog and job binding | Deferred | Add from future job evidence. |
+| 6–7. Demand-driven catalog and job binding | Active for the lead-management reference instance | The supplied GHL lead job and the user's request establish a concrete next instance; map capabilities to reuse/adapt/new after account inventory and business settings are confirmed. |
+| 8. Lead-management portfolio instance | `INTAKE` / waiting on user-owned account details | Target: one input source → normalize/validate → qualification and review path → GHL contact/opportunity → acknowledgement/follow-up with stop conditions → logs/recovery/docs. First live test should use synthetic test data in the user's own authorized accounts. |
+
+### Lead-management intake snapshot
+
+| Item | State | Evidence / owner / next step |
+|---|---|---|
+| Business outcome and initial scope | Confirmed | Supplied Upwork brief: capture one enquiry source, qualify, upsert GHL contact/opportunity, send approved follow-up, stop on reply/booking/opt-out/pause. |
+| Build a concrete instance and reuse new capabilities | Confirmed | User explicitly asked to start, finish, and test on available real accounts; framework gaps exposed by the instance become reusable modules. |
+| CRM account and test location | Unknown; blocking for GHL live run | User to identify whether a GHL account/location and a test pipeline are available. No credential values in chat. |
+| Input source and public callback reachability | Unknown; blocking for end-to-end source test | User to identify an existing form/source or approve a local webhook test; a cloud form needs a public HTTPS callback, while current Compose ports bind to loopback. |
+| Sender account | Unknown; blocking for live acknowledgement | User to identify provider and permit a single test message only to an address they control. |
+| Qualification criteria, fields, pipeline/stage, and message/stop behavior | Material business choices unresolved | Use the supplied brief as requirements; ask the user to define or explicitly approve a small demonstration rubric and test-only message before those side effects. |
+| LLM provider | Optional / unknown | A deterministic/manual-review path can be tested without API billing; real LLM calls require an available provider credential. |
+| Policy and data-handling facts | Unresolved for production leads | First live run is bounded to synthetic test data; before handling real prospects, establish source notice/consent, jurisdictions, retention, recipients, and whether follow-up is transactional or marketing. |
+
+Current readiness: **`BLOCKED_BY_USER` for the end-to-end real-account run**. Repository inspection, official API research, module contracts, synthetic tests, and workflow design can continue independently. Do not send email or create CRM records until the user confirms the available account and test side effects.
 
 ---
 
