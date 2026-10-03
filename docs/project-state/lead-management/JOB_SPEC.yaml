@@ -18,6 +18,23 @@ non_goals:
   - "Use the user's game VPS at 103.178.234.213:2786."
   - "Claim live provider behavior from mocks, fixtures, or local module tests."
   - "Add unrelated CRM/provider integrations without job demand."
+module_readiness_policy:
+  paid_provider_testing: >-
+    Do not spend portfolio funds on paid-provider calls. Independently verify
+    module contracts, request construction, credential/configuration checks,
+    response/error mapping, retry and unknown-outcome behavior with synthetic
+    inputs and mocked transports. Clearly label this as mock evidence. Note the
+    account/license, usage/quota, and credential requirements. A live call is
+    deferred until a client provides the account/API and authorizes any charge,
+    unless account-specific behavior is itself an acceptance criterion.
+  meaning_of_ready: >-
+    "Ready for client credentials" means the bounded adapter passed its
+    independent checks and its explicit configuration requirements are known;
+    it does not guarantee compatibility with every account, plan, permission,
+    field mapping, or provider change. Verify those during client onboarding.
+  risk_standard: >-
+    Do not claim zero risk. Record tested failure boundaries, residual risks,
+    unsupported guarantees, and the exact evidence level for every module.
 inputs_and_sources:
   - description: "Google Forms API schema and response pages, read-only scopes only"
     reference: "Private unpublished Lead Intake Lab - Test Only Form; private ID omitted from Git"

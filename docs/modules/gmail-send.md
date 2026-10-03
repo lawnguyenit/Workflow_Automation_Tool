@@ -13,6 +13,12 @@ Status: implemented and verified with synthetic HTTP transport plus local Postgr
 
 ## Side effects and recovery
 
+## Cost and client account
+
+- Synthetic transport/PostgreSQL tests do not send email and require no API usage.
+- Google currently lists standard Gmail API calls as no additional cost within its usage thresholds; quotas apply, and Google says charges above the daily threshold are planned later in 2026. Check [Gmail API quota and pricing](https://developers.google.com/workspace/gmail/api/reference/quota) before a live client run. The sender mailbox or Google Workspace plan is client-owned and may have its own subscription cost.
+- A live send requires the client's protected OAuth credential with the `gmail.send` scope and explicit authorization of the recipient/content. The scope is classified by Google as sensitive; a public OAuth app may need verification. No portfolio live send is required for module verification.
+
 - `DRY_RUN` and `REPLAY` return a preview; `MOCK` returns a mock result. These modes do not touch PostgreSQL or Gmail.
 - `REAL` writes the message intent to the existing PostgreSQL outbox, conditionally claims `PENDING → SENDING`, then calls Gmail. A concurrent caller cannot claim the same intent. `SENT` duplicates do not send again. Changed content under the same key fails closed.
 - Gmail's send API does not expose an idempotency token. A timeout, transport failure, server error, malformed success body, or failure recording the confirmed send becomes `UNKNOWN`/`SENDING`; subsequent calls are held for reconciliation and are never resent automatically. Check Gmail Sent and the outbox record before changing its state.

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 from datetime import UTC, datetime
 from typing import Any
 
@@ -15,6 +17,14 @@ from workflow_automation.contracts import (
     Retryability,
     RunMode,
 )
+from workflow_automation.infrastructure.postgres_ghl_contact_upsert_ledger import (
+    GHLContactAlreadyInProgress,
+    GHLContactInputConflict,
+    GHLContactLedgerError,
+    GHLContactLedgerNotConfigured,
+    GHLContactReconciliationRequired,
+    PostgresGHLContactUpsertLedger,
+)
 
 
 _URL = "https://services.leadconnectorhq.com/contacts/upsert"
@@ -24,6 +34,7 @@ _CONTACT_FIELDS = {
     "customFields", "dnd", "inboundDndSettings", "dndSettings", "dateOfBirth", "gender",
     "createNewIfDuplicateAllowed",
 }
+_SOURCE_EVENT_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,499}$")
 
 
 class GHLUpsertContact:
@@ -42,15 +53,27 @@ class GHLUpsertContact:
         bearer_token: str | None = None,
         timeout_seconds: float = 15.0,
         http_client: httpx.Client | None = None,
+        effect_ledger: Any | None = None,
     ) -> None:
         self.location_id = location_id
         self._bearer_token = bearer_token if bearer_token is not None else os.getenv("GHL_PRIVATE_INTEGRATION_TOKEN")
         self._timeout_seconds = timeout_seconds
         self._http_client = http_client
+        self._effect_ledger = effect_ledger or PostgresGHLContactUpsertLedger()
 
     def execute(self, payload: dict[str, Any], context: ExecutionContext) -> ModuleResult:
         started = datetime.now(UTC)
-        contact = payload.get("contact")
+        if not isinstance(payload, dict) or set(payload) != {"contact", "idempotency_key"}:
+            return self._result(context, started, ResultState.FAILURE, "INVALID_CONTACT",
+                                "payload must contain exactly contact and idempotency_key",
+                                Retryability.NOT_RETRYABLE)
+        contact = payload["contact"]
+        idempotency_key = payload["idempotency_key"]
+        if (not isinstance(idempotency_key, str) or not _SOURCE_EVENT_KEY.fullmatch(idempotency_key)
+                or len(idempotency_key.split(":")) < 3):
+            return self._result(context, started, ResultState.FAILURE, "INVALID_CONTACT",
+                                "idempotency_key must be an opaque namespaced source-event identity",
+                                Retryability.NOT_RETRYABLE)
         validation_error = self._validate_contact(contact)
         if validation_error:
             return self._result(context, started, ResultState.FAILURE, "INVALID_CONTACT", validation_error,
@@ -80,13 +103,61 @@ class GHLUpsertContact:
             return self._result(context, started, ResultState.FAILURE, "CREDENTIAL_NOT_CONFIGURED",
                                 "REAL mode requires GHL_PRIVATE_INTEGRATION_TOKEN in the runtime secret store",
                                 Retryability.NOT_RETRYABLE)
-
         headers = {
             "Authorization": f"Bearer {self._bearer_token}",
             "Version": "v3",
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
+        event_key = hashlib.sha256(
+            ("ghl-v3-contact-upsert\0" + self.location_id + "\0" + idempotency_key).encode("utf-8")
+        ).hexdigest()
+        input_fingerprint = hashlib.sha256(
+            json.dumps(contact, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                       allow_nan=False).encode("utf-8")
+        ).hexdigest()
+        try:
+            stored_result, cached = self._effect_ledger.run_once(
+                event_key=event_key,
+                input_fingerprint=input_fingerprint,
+                operation=lambda: self._upsert(context, started, request_body, headers),
+                uncertain_error_code=self._uncertain_error_code,
+            )
+            if cached:
+                result = ModuleResult(module_id=self.module_id, status=ResultState.SUCCESS,
+                                      business_result=stored_result, context=context,
+                                      started_at=started).complete()
+            else:
+                result = stored_result
+        except GHLContactAlreadyInProgress:
+            result = self._result(context, started, ResultState.REVIEW_REQUIRED,
+                                  "CONTACT_WRITE_IN_PROGRESS",
+                                  "Another run is processing this source event; retry after it completes",
+                                  Retryability.RETRYABLE)
+        except GHLContactInputConflict:
+            result = self._result(context, started, ResultState.REVIEW_REQUIRED,
+                                  "CONTACT_EVENT_PAYLOAD_CONFLICT",
+                                  "This source event was already processed with different contact data; review before retrying",
+                                  Retryability.NOT_RETRYABLE)
+        except GHLContactReconciliationRequired:
+            result = self._result(context, started, ResultState.REVIEW_REQUIRED,
+                                  "CONTACT_RECONCILIATION_REQUIRED",
+                                  "An earlier contact write has not been reconciled; inspect HighLevel before retrying",
+                                  Retryability.NOT_RETRYABLE)
+        except GHLContactLedgerNotConfigured:
+            result = self._result(context, started, ResultState.FAILURE, "CONTACT_LEDGER_NOT_READY",
+                                  "Configure DATABASE_URL and apply migration 008 before REAL contact writes",
+                                  Retryability.NOT_RETRYABLE)
+        except GHLContactLedgerError:
+            result = self._result(context, started, ResultState.REVIEW_REQUIRED,
+                                  "CONTACT_LEDGER_UNAVAILABLE",
+                                  "Contact event ledger is unavailable; do not retry until database state is checked",
+                                  Retryability.UNKNOWN)
+        result.metrics["effect_key"] = event_key
+        return result
+
+    def _upsert(self, context: ExecutionContext, started: datetime, request_body: dict[str, Any],
+                headers: dict[str, str]) -> ModuleResult:
         try:
             if self._http_client is not None:
                 response = self._http_client.post(_URL, headers=headers, json=request_body,
@@ -94,13 +165,9 @@ class GHLUpsertContact:
             else:
                 response = httpx.post(_URL, headers=headers, json=request_body,
                                       timeout=self._timeout_seconds)
-        except httpx.TimeoutException:
+        except (httpx.TimeoutException, httpx.RequestError):
             return self._result(context, started, ResultState.REVIEW_REQUIRED, "REMOTE_OUTCOME_UNKNOWN",
-                                "HighLevel request timed out; reconcile the contact before retrying",
-                                Retryability.UNKNOWN)
-        except httpx.RequestError:
-            return self._result(context, started, ResultState.REVIEW_REQUIRED, "REMOTE_OUTCOME_UNKNOWN",
-                                "HighLevel connection failed; reconcile the contact before retrying",
+                                "HighLevel write outcome is unknown; reconcile the matching contact before retrying",
                                 Retryability.UNKNOWN)
 
         if response.status_code == 429:
@@ -122,8 +189,9 @@ class GHLUpsertContact:
                                 "HighLevel returned a server error after a write request; reconcile before retrying",
                                 Retryability.UNKNOWN)
         if response.status_code not in (200, 201):
-            return self._result(context, started, ResultState.FAILURE, "UNEXPECTED_HTTP_STATUS",
-                                "HighLevel returned an unexpected response status", Retryability.UNKNOWN)
+            return self._result(context, started, ResultState.REVIEW_REQUIRED, "REMOTE_RESPONSE_UNVERIFIED",
+                                "HighLevel returned an unexpected status after a write; reconcile before retrying",
+                                Retryability.UNKNOWN)
 
         try:
             body = response.json()
@@ -141,6 +209,14 @@ class GHLUpsertContact:
                             context=context, started_at=started).complete()
 
     @staticmethod
+    def _uncertain_error_code(result: ModuleResult) -> str | None:
+        if result.status == ResultState.REVIEW_REQUIRED and result.errors:
+            error = result.errors[0]
+            if error.code in {"REMOTE_OUTCOME_UNKNOWN", "REMOTE_RESPONSE_UNVERIFIED"}:
+                return error.code
+        return None
+
+    @staticmethod
     def _validate_contact(contact: Any) -> str | None:
         if not isinstance(contact, dict):
             return "payload.contact must be an object"
@@ -153,10 +229,17 @@ class GHLUpsertContact:
             return "contact contains unsupported fields: " + ", ".join(sorted(unknown))
         if not any(contact.get(field) for field in ("email", "phone")):
             return "contact must include an email or phone for duplicate matching"
+        duplicate_override = contact.get("createNewIfDuplicateAllowed")
+        if duplicate_override is not None and not isinstance(duplicate_override, bool):
+            return "contact.createNewIfDuplicateAllowed must be boolean when supplied"
+        if duplicate_override is True:
+            return "contact.createNewIfDuplicateAllowed=true is blocked to avoid bypassing duplicate matching"
         for field in ("email", "phone", "firstName", "lastName", "name"):
             value = contact.get(field)
             if value is not None and (not isinstance(value, str) or len(value) > 500):
                 return f"contact.{field} must be null or bounded text"
+            if field in {"email", "phone"} and value is not None and not value.strip():
+                return f"contact.{field} must be non-empty when supplied"
         try:
             serialized = json.dumps(contact, allow_nan=False, separators=(",", ":"))
         except (TypeError, ValueError):

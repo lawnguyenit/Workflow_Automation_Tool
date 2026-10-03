@@ -18,6 +18,10 @@ from workflow_automation.definitions import (
 )
 from workflow_automation.executors import PythonExecutor
 from workflow_automation.infrastructure.postgres_effect_guard import PostgresExternalEffectGuard
+from workflow_automation.infrastructure.postgres_ghl_contact_upsert_ledger import PostgresGHLContactUpsertLedger
+from workflow_automation.infrastructure.postgres_ghl_opportunity_upsert_ledger import (
+    PostgresGHLOpportunityUpsertLedger,
+)
 from workflow_automation.infrastructure.postgres_lead_qualification_ledger import PostgresLeadQualificationLedger
 from workflow_automation.infrastructure.postgres_source_poll_checkpoint import PostgresSourcePollCheckpoint
 from workflow_automation.models import ModuleInstance
@@ -59,7 +63,7 @@ def build_registry(additional_module_instances=None) -> FrameworkRegistry:
         instance_catalog.append(ModuleInstance(
             instance_id="portfolio.ghl_contact_upsert",
             module="crm.ghl_upsert_contact",
-            implementation="crm.ghl_upsert_contact.http.v1",
+            implementation="crm.ghl_upsert_contact.http.v2",
             executor_id="python.local",
             config={"location_id": ghl_location_id},
         ))
@@ -68,7 +72,7 @@ def build_registry(additional_module_instances=None) -> FrameworkRegistry:
         instance_catalog.append(ModuleInstance(
             instance_id="portfolio.ghl_opportunity_upsert",
             module="crm.ghl_upsert_opportunity",
-            implementation="crm.ghl_upsert_opportunity.http.v1",
+            implementation="crm.ghl_upsert_opportunity.http.v2",
             executor_id="python.local",
             config={"location_id": ghl_location_id},
         ))
@@ -166,12 +170,14 @@ def build_registry(additional_module_instances=None) -> FrameworkRegistry:
             module = GHLUpsertContact(
                 location_id=config.get("location_id", ""),
                 timeout_seconds=config.get("timeout_seconds", 15),
+                effect_ledger=PostgresGHLContactUpsertLedger(),
             )
         elif item.module == "crm.ghl_upsert_opportunity":
             module = GHLUpsertOpportunity(
                 location_id=config.get("location_id", ""),
                 timeout_seconds=config.get("timeout_seconds", 15),
                 effect_guard=PostgresExternalEffectGuard(),
+                event_ledger=PostgresGHLOpportunityUpsertLedger(),
             )
         elif item.module == "crm.ghl_contact_tags":
             module = GHLContactTags(

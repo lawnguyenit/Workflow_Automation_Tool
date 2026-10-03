@@ -82,3 +82,12 @@ decisions:
     evidence_or_rationale: "This is a technical control flow choice that implements the approved fail-closed manual-review intent; it does not choose qualification labels, CRM mappings, or message policy."
     date: 2026-10-03
     supersedes: null
+  - id: DEC-JOB-010
+    question: "Does portfolio module readiness require paid live-provider calls?"
+    options_considered: ["Require live paid calls for every adapter", "Independently verify module behavior and credential path; defer billable live use to a client-provided account"]
+    decision: "Do not spend the user's money on paid provider calls. A paid-provider module may pass bounded module verification using synthetic/fixture inputs and mocked HTTP, with credential/configuration and failure behavior checked independently. Record whether the service/account is paid, whose account must be supplied, usage/quota exposure, and any client-side setup. A live call is required only when the client job acceptance or account-specific mapping depends on it; the client supplies the account/API and authorizes any billable operation. Mock evidence must never be described as live-provider verification."
+    status: approved
+    owner: user
+    evidence_or_rationale: "User clarified that costs should be noted; in a real job the client is expected to provide the account/API. A module can be tested independently, and the whole pipeline need not be completed for this portfolio exercise."
+    date: 2026-10-03
+    supersedes: null

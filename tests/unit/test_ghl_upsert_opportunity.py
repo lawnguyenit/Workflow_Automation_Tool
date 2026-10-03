@@ -3,6 +3,10 @@ import json
 import httpx
 
 from workflow_automation.contracts import ExecutionContext, RunMode
+from workflow_automation.infrastructure.postgres_ghl_opportunity_upsert_ledger import (
+    GHLOpportunityInputConflict,
+    GHLOpportunityReconciliationRequired,
+)
 from workflow_automation.infrastructure.postgres_effect_guard import EffectReconciliationPending
 from workflow_automation.modules.crm.ghl_upsert_opportunity import GHLUpsertOpportunity
 
@@ -11,7 +15,7 @@ def _context(mode=RunMode.REAL):
     return ExecutionContext(workflow_id="ghl_opportunity_test", mode=mode)
 
 
-def _payload(**changes):
+def _payload(*, idempotency_key="forms:test-account:response-123", **changes):
     opportunity = {
         "contactId": "contact-123",
         "pipelineId": "pipeline-456",
@@ -22,7 +26,7 @@ def _payload(**changes):
         "forecastProbability": 35,
         "customFields": [{"id": "field-1", "fieldValue": "qualified"}],
     }
-    return {"opportunity": {**opportunity, **changes}}
+    return {"idempotency_key": idempotency_key, "opportunity": {**opportunity, **changes}}
 
 
 class _FakeEffectGuard:
@@ -40,10 +44,35 @@ class _FakeEffectGuard:
         return result
 
 
-def _module(handler, *, token="test-token", guard=None):
+class _MemoryOpportunityLedger:
+    def __init__(self):
+        self.events = {}
+
+    def run_once(self, *, event_key, input_fingerprint, operation, uncertain_error_code):
+        existing = self.events.get(event_key)
+        if existing:
+            if existing[0] != input_fingerprint:
+                raise GHLOpportunityInputConflict()
+            if existing[1] == "UNKNOWN":
+                raise GHLOpportunityReconciliationRequired()
+            saved = existing[2]
+            return {"state": "UPSERTED", **saved, "side_effect": False, "cached": True}, True
+        result = operation()
+        error_code = uncertain_error_code(result)
+        if error_code:
+            self.events[event_key] = (input_fingerprint, "UNKNOWN", None)
+        elif result.status.value == "SUCCESS":
+            business = result.business_result
+            self.events[event_key] = (input_fingerprint, "SUCCEEDED",
+                                      {"opportunity_id": business["opportunity_id"], "new": business["new"]})
+        return result, False
+
+
+def _module(handler, *, token="test-token", guard=None, ledger=None):
     client = httpx.Client(transport=httpx.MockTransport(handler))
     return GHLUpsertOpportunity(location_id="test-location", bearer_token=token,
-                                http_client=client, effect_guard=guard or _FakeEffectGuard()), client
+                                http_client=client, effect_guard=guard or _FakeEffectGuard(),
+                                event_ledger=ledger or _MemoryOpportunityLedger()), client
 
 
 def test_creates_when_no_open_contact_pipeline_match_and_suppresses_pii():
@@ -199,6 +228,38 @@ def test_unknown_write_is_durably_held_by_guard_and_retry_makes_no_provider_call
     assert "contact-123" not in first.metrics["effect_key"]
     assert second.errors[0].code == "EFFECT_RECONCILIATION_REQUIRED"
     assert calls == ["GET", "POST"]
+
+
+def test_confirmed_success_replay_uses_cache_and_changed_event_payload_is_rejected():
+    calls = []
+
+    def handler(request):
+        calls.append(request.method)
+        if request.method == "GET":
+            return httpx.Response(200, json={"opportunities": [], "meta": {"total": 0}})
+        return httpx.Response(201, json={"opportunity": {"id": "opp-123"}})
+
+    module, client = _module(handler)
+    try:
+        first = module.execute(_payload(), _context())
+        replay = module.execute(_payload(), _context())
+        changed = module.execute(_payload(name="Changed stage update"), _context())
+    finally:
+        client.close()
+    assert first.business_result["side_effect"] is True
+    assert replay.business_result == {"state": "UPSERTED", "opportunity_id": "opp-123", "new": True,
+                                      "side_effect": False, "cached": True}
+    assert changed.errors[0].code == "OPPORTUNITY_EVENT_PAYLOAD_CONFLICT"
+    assert calls == ["GET", "POST"]
+
+
+def test_event_identity_is_required_even_when_provider_is_not_called():
+    module, client = _module(lambda _request: httpx.Response(200))
+    try:
+        result = module.execute({"opportunity": _payload()["opportunity"]}, _context())
+    finally:
+        client.close()
+    assert result.errors[0].code == "INVALID_OPPORTUNITY"
 
 
 def test_auth_scope_and_provider_server_errors_are_distinguished():

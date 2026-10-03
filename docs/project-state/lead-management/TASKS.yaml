@@ -151,3 +151,18 @@ tasks:
     acceptance_checks: ["Review result is stored while a gated CRM-like step is skipped", "fully successful path invokes downstream step", "registry rejects gate references that are not dependencies", "aggregate status preserves earlier non-success outcomes"]
     verification: ["uv run pytest -q tests/unit/test_framework_core.py tests/unit/test_api.py tests/unit/test_registry_factory.py: 30 passed; full suite 193 passed"]
     status: completed
+  - id: TASK-011
+    caller: workflow lead
+    callee: independent deliverable auditor
+    objective: "Audit each lead-pipeline capability for independently testable readiness with client credentials, including cost and quota disclosure, without requiring portfolio-funded provider calls."
+    inputs: ["DEC-JOB-010", "PIPELINE.yaml CAP-001 through CAP-010", "module contracts/source/tests", "provider cost checklist", "synthetic module test evidence"]
+    expected_output: "Per-module findings that distinguish mock/local readiness from account-specific live verification and identify any residual safety gaps."
+    owner: workflow lead
+    allowed_files: ["docs/project-state/lead-management/"]
+    dependencies: []
+    preconditions: ["Use synthetic data and mocked transports for provider modules", "Local Compose PostgreSQL integration harnesses must check their target database before cleanup"]
+    must_not_change: ["Do not call Google, OpenAI, HighLevel, or Gmail", "Do not spend portfolio funds", "Do not claim zero risk or live-provider verification from mocks"]
+    blocking_or_stop_condition: "Any module with an unsafe retry/unknown-outcome path or missing account-specific precondition remains risk/blocked until fixed or explicitly bounded."
+    acceptance_checks: ["Run available module unit tests individually", "Run independent local PostgreSQL/mock-HTTP integration harnesses", "Record current cost/account prerequisites", "Keep whole workflow acceptance separate"]
+    verification: ["Twelve lead-pipeline unit files run independently on 2026-10-03: Forms mapper 6, intake/store 8, qualification 10, checkpoint 13, GHL contact 11, tags 4, opportunity 12, follow-up 10, Gmail 18, effect guard 5, incident log 5, workflow core 7; all passed.", "Ten synthetic Docker/PostgreSQL integrations passed on 2026-10-03; all provider transports were mocked and cleanup assertions passed.", "Independent read-only review confirmed contact and opportunity same-event cache/unknown holds; opportunity harness also proves distinct-event entity contention and inspects both reconciliation ledgers. Live-provider acceptance and full pipeline remain incomplete; gaps are recorded in docs/project-state/verification.md and lead-management/COSTS.md."]
+    status: completed

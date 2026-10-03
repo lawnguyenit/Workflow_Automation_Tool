@@ -4,6 +4,11 @@ Status: reusable mapper, composed lead workflow, and inactive n8n polling templa
 
 ## Contract
 
+## Cost and client account
+
+- Google currently lists standard Forms API use as no additional cost, with per-minute quotas; Google says quota-limit overage charges are planned for later in 2026. Check the live [Forms API usage and pricing page](https://developers.google.com/workspace/forms/api/limits) before enabling a client's poller.
+- OAuth, access to the actual Form, and Google account/Workspace terms still apply. The account owner must approve the account-level read scopes. Synthetic mapper/checkpoint tests require no Google API request; this does not verify OAuth access or live Form schema.
+
 `source.google_forms_api_response` accepts exactly `{ "form_id": "...", "form": { ...Google Forms API Form... }, "response": { ...FormResponse... } }`.
 
 - It requires the schema's `formId` to match the configured form ID and, when present, the response's `formId` to match too.

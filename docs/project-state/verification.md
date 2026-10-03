@@ -1,4 +1,25 @@
-## Current release 0.13.0 — Workflow success gates
+## Current release 0.14.0 — Cost-aware module readiness and GHL event ledgers
+
+Release 0.14.0 records the user's rule that portfolio work must not incur paid provider usage; job-specific accounts and paid credentials are supplied by the client when needed. It adds durable confirmed-success caches and unknown-outcome holds for the GHL contact and opportunity adapters. This is module-level evidence; the supplied end-to-end brief remains incomplete.
+
+### Verification — 2026-10-03
+
+- Approved decision DEC-JOB-010 and `docs/project-state/lead-management/COSTS.md` record account/API prerequisites, pricing or quota exposure, and paid-feature checks for Forms, Gmail, OpenAI, HighLevel, n8n, and PostgreSQL. No billable provider call was needed or made.
+- Full repository suite: `uv run pytest -q` — **198 passed**, one existing Starlette/httpx deprecation warning. Twelve lead-pipeline unit files were also run independently; all passed, including contact and opportunity replay tests.
+- Ten synthetic Docker Compose integrations passed against the local `workflow_automation` PostgreSQL database. They cover both Forms-shaped lead paths, source checkpoint/leases, qualification cache/unknown hold/call cap, follow-up stop/pause/concurrency, GHL tag guard, GHL contact and opportunity event ledgers, Gmail outbox, and incident-log API. The contact/opportunity harnesses use mocked HTTP and report one provider request on overlap, success replay from cache, changed-input conflict, unknown-outcome hold, and synthetic-row cleanup. All ten completed their cleanup.
+- Rebuilt the API container at package version **0.14.0**, applied migrations **008** (contact ledger) and **009** (opportunity ledger) twice successfully, confirmed both schema-version rows, and received `{"status":"ok"}` from `/healthz`. A separate temporary PostgreSQL database initialized from `infra/postgres/init.sql` also contained both ledger tables/version rows; the temporary database was dropped after verification.
+- Independent module review confirmed the contact and opportunity same-source replay controls and their harness results. It did not call a provider. No Forms OAuth grant/request, OpenAI request, live HighLevel operation, or Gmail API module send occurred.
+
+### Boundaries that remain
+
+- The composed lead graph still ends at local PostgreSQL; it does not qualify a live Form lead, write it to HighLevel, and send the approved follow-up in one accepted run.
+- These event ledgers protect stable same-source event keys and callers sharing this database. Distinct source events/person matching still relies on HighLevel's Location duplicate configuration; independent HighLevel writers, eventual search visibility, and actual tenant mappings need client-account verification. Source-key format cannot semantically prove that a caller avoided PII. Ledger retention must exceed the replay horizon; no cleanup job is provided.
+- The Google Forms poller is imported but inactive and has no OAuth client/grant or token. The owner has not selected current versus dedicated Google account scope. No live schema/question-ID check exists.
+- OpenAI requires a separately billed API account; current protection is a call-count ceiling, not a USD spend cap. Live rubric quality, privacy, and cost remain unverified.
+- Follow-up has a local suppression gate but no authoritative reply/booking/opt-out producers, approved message/enrollment policy, schedule, or connected sender. Gmail OAuth refresh is not implemented by the standalone sender. External alert delivery, DLQ worker, operator UI for every reconciliation, retention automation, load/capacity tests, and production monitoring remain incomplete.
+- Mocks/local integrations demonstrate adapter boundaries and named failure paths only; they do not establish zero risk or acceptance on an arbitrary customer's plan, tenant, scopes, or n8n installation. The [0.13.0 full-brief audit snapshot](AUDIT-0.13.0.yaml) predates this release and its verdict remains that the complete brief was not ready; use this verification record for current module evidence and gaps.
+
+## Prior release 0.13.0 — Workflow success gates
 
 Release 0.13.0 adds explicit success-gated workflow steps and severity-preserving aggregate status. It does not complete the supplied Upwork lead-management brief.
 

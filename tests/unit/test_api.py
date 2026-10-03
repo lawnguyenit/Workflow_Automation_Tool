@@ -140,7 +140,8 @@ def test_ghl_module_endpoint_is_exposed_without_leaking_runtime_token(monkeypatc
     assert "synthetic-secret" not in str(catalog)
 
     response = client.post("/v1/instances/portfolio.ghl_contact_upsert/runs", json={
-        "payload": {"contact": {"email": "ada@example.invalid", "name": "Ada Example"}},
+        "payload": {"idempotency_key": "synthetic:forms:response-1",
+                    "contact": {"email": "ada@example.invalid", "name": "Ada Example"}},
     })
     assert response.status_code == 200
     assert response.json()["business_result"] == {"state": "PREVIEWED", "side_effect": False}
@@ -149,7 +150,7 @@ def test_ghl_module_endpoint_is_exposed_without_leaking_runtime_token(monkeypatc
                            if item["instance_id"] == "portfolio.ghl_opportunity_upsert")
     assert module_instance["config"] == {"location_id": "synthetic-location"}
     opportunity_response = client.post("/v1/instances/portfolio.ghl_opportunity_upsert/runs", json={
-        "payload": {"opportunity": {
+        "payload": {"idempotency_key": "forms:test-account:response-1", "opportunity": {
             "contactId": "synthetic-contact", "pipelineId": "synthetic-pipeline",
             "pipelineStageId": "synthetic-stage", "name": "Synthetic opportunity", "status": "open",
         }},

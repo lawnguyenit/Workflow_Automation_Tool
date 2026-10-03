@@ -42,6 +42,7 @@ capabilities:
       postconditions: ["Cursor commits monotonically only after accepted local response-store outcomes", "empty poll releases lease"]
       failures_and_partial_results: ["OAuth/API/page error stops without commit", "remaining page token at cap fails closed", "lost lease rejects commit; prior cursor can replay events"]
       side_effects_permissions_and_limits: ["Read-only Forms API scopes", "900-second PostgreSQL lease", "No public endpoint", "lease cannot cancel work already in progress"]
+      billing_and_customer_resources: "Google documents standard Forms API use as no-additional-cost, subject to per-minute quotas; quota-limit overage charges are planned for later in 2026. Requires a Google account with access to the test Form and OAuth consent; account-scope decision remains unresolved."
       dependencies_and_compatibility: ["n8n 2.41.6", "local API/PostgreSQL", "no provider runtime test"]
       verification: ["synthetic checkpoint integration", "workflow inactive/uncredentialed", "live Form read pending"]
   - id: CAP-002
@@ -84,6 +85,7 @@ capabilities:
       postconditions: ["Claim/cached result protects repeat model requests for stable event/fingerprint"]
       failures_and_partial_results: ["Malformed/uncertain output, changed payload or unknown prior attempt holds for review/reconciliation"]
       side_effects_permissions_and_limits: ["REAL mode can incur model charges", "UTC-day request count cap is not a monetary spend limit"]
+      billing_and_customer_resources: "OpenAI API usage is billed separately from ChatGPT Plus by model/token and applicable features. No portfolio live call is required; a client must provide an API organization/key and set a monetary budget for a live job."
       dependencies_and_compatibility: ["OpenAI API credential absent", "PostgreSQL migration 004"]
       verification: ["mock/unit ledger evidence", "no live quality/cost test"]
   - id: CAP-005
@@ -104,16 +106,17 @@ capabilities:
     purpose: "Upsert GHL contact/custom fields, add tags, and create/update the approved opportunity."
     implementation_source: "src/workflow_automation/modules/crm/ghl_upsert_contact.py; ghl_contact_tags.py; ghl_upsert_opportunity.py"
     classification: reuse
-    evidence: ["synthetic HTTP tests; tag/PostgreSQL effect-guard integration", "no GHL account or composed edge"]
+    evidence: ["synthetic HTTP tests; contact/opportunity source-event cache and unknown-outcome PostgreSQL integrations; tag effect-guard integration", "no GHL account or composed edge"]
     module_contract:
-      input: "Qualified lead, owner-approved Location/custom-field/tag/pipeline/stage map, protected token."
+      input: "Qualified lead with stable non-PII source-event key, owner-approved Location/custom-field/tag/pipeline/stage map, protected token."
       output: "Provider contact/opportunity result or a bounded review/reconciliation state."
-      assumptions_and_preconditions: ["Owner resolves contact match and opportunity update policies", "GHL credentials and scopes configured directly in protected runtime"]
-      postconditions: ["No destructive tag replacement; ambiguous matches/writes hold for review"]
+      assumptions_and_preconditions: ["Owner resolves contact match and opportunity update policies", "GHL credentials and scopes configured directly in protected runtime", "Stable non-PII source event key survives retries", "Migrations 003, 008, and 009 are applied"]
+      postconditions: ["No destructive tag replacement; same-event contact and opportunity results are cached or held for reconciliation; changed event payloads and ambiguous opportunity matches/writes hold for review"]
       failures_and_partial_results: ["Unknown remote outcome blocks unsafe retry; operator reconciles provider state first"]
       side_effects_permissions_and_limits: ["External CRM write", "separate effect guard does not cover independent external writers", "provider rate limit behavior needs live validation"]
-      dependencies_and_compatibility: ["GHL test Location, token, database migration 003, account mapping"]
-      verification: ["mock/synthetic only; no live contact/opportunity"]
+      billing_and_customer_resources: "Requires a client-owned active HighLevel account/Location and appropriately scoped token. Subscription and optional product/workflow/AI charges depend on the client's plan and enabled features; inspect the account billing page before enabling any billable feature. Synthetic adapter checks do not require a HighLevel subscription."
+      dependencies_and_compatibility: ["GHL test Location, token, database migrations 003, 008, and 009, account mapping"]
+      verification: ["mock/synthetic only; contact replay uses migration 008; opportunity replay uses migration 009 plus entity guard migration 003; tag unknown outcomes use migration 003; no live contact/opportunity"]
   - id: CAP-007
     purpose: "Durably determine whether a lead may receive follow-up and persist stop/pause events."
     implementation_source: "src/workflow_automation/modules/processing/lead_followup_gate.py; docs/modules/lead-followup-gate.md"
@@ -140,6 +143,7 @@ capabilities:
       postconditions: ["No send if suppression state is absent/stopped/paused"]
       failures_and_partial_results: ["Unknown send outcome holds for reconciliation; do not blindly resend"]
       side_effects_permissions_and_limits: ["External email send; prior one-time test-send permission does not authorize lead follow-up"]
+      billing_and_customer_resources: "Standard Gmail API calls currently have no additional charge within Google's usage thresholds; quotas apply and charges above the daily threshold are planned later in 2026. The mailbox/account and any Google Workspace subscription are client-owned. Send calls are still external side effects and require message authorization."
       dependencies_and_compatibility: ["Local Gmail credential absent; no follow-up policy"]
       verification: ["no lead message or runtime provider call"]
   - id: CAP-009

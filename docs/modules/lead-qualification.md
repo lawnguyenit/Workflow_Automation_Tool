@@ -12,6 +12,12 @@ Status: implemented and synthetic-fixture verified; no live model request has be
 
 ## Safety and operational behavior
 
+## Cost and client account
+
+- `MOCK`, `REPLAY`, fixtures, and local unit/integration checks make no OpenAI API request and incur no model usage charge.
+- A live `REAL` request uses the customer's OpenAI API organization/key and is billed separately from ChatGPT Plus; usage varies by selected model, input/output tokens, and tools. The current API pricing is published at [OpenAI API pricing](https://developers.openai.com/api/docs/pricing). Have the client configure its own billing/spend controls and approve a test budget before any live request. The local daily call-count cap is not a dollar cap.
+- For a client job, verify model access, organization limits, and current rates against that customer's account before enabling REAL. Mock verification does not prove live model quality or account billing behavior.
+
 - The workflow owner must supply the rubric and classes; the module does not invent sales policy. Criteria and prompt versions should be reviewed whenever business rules change.
 - A separate OpenAI API credential is required for `REAL`; a ChatGPT Plus subscription is not an API credential. No API key or model call is configured in the current instance.
 - Input and output sizes are bounded. The request sends free-text enquiry content to the configured provider, so confirm purpose, notice, provider settings, and data-handling requirements before real lead data is used.

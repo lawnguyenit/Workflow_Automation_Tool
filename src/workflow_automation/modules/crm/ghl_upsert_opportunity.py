@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import hashlib
 import os
+import re
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -22,6 +23,14 @@ from workflow_automation.contracts import (
     Retryability,
     RunMode,
 )
+from workflow_automation.infrastructure.postgres_ghl_opportunity_upsert_ledger import (
+    GHLOpportunityAlreadyInProgress,
+    GHLOpportunityInputConflict,
+    GHLOpportunityLedgerError,
+    GHLOpportunityLedgerNotConfigured,
+    GHLOpportunityReconciliationRequired,
+    PostgresGHLOpportunityUpsertLedger,
+)
 
 
 _BASE_URL = "https://services.leadconnectorhq.com"
@@ -32,6 +41,7 @@ _ALLOWED_FIELDS = {
 _PAGE_SIZE = 100
 _MAX_SEARCH_PAGES = 10
 _MAX_REQUEST_BYTES = 32_768
+_SOURCE_EVENT_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,499}$")
 
 
 class GHLUpsertOpportunity:
@@ -51,16 +61,28 @@ class GHLUpsertOpportunity:
         timeout_seconds: float = 15.0,
         http_client: httpx.Client | None = None,
         effect_guard: Any = None,
+        event_ledger: Any | None = None,
     ) -> None:
         self.location_id = location_id
         self._bearer_token = bearer_token if bearer_token is not None else os.getenv("GHL_PRIVATE_INTEGRATION_TOKEN")
         self._timeout_seconds = timeout_seconds
         self._http_client = http_client
         self._effect_guard = effect_guard
+        self._event_ledger = event_ledger or PostgresGHLOpportunityUpsertLedger()
 
     def execute(self, payload: dict[str, Any], context: ExecutionContext) -> ModuleResult:
         started = datetime.now(UTC)
-        opportunity = payload.get("opportunity")
+        if not isinstance(payload, dict) or set(payload) != {"idempotency_key", "opportunity"}:
+            return self._result(context, started, ResultState.FAILURE, "INVALID_OPPORTUNITY",
+                                "payload must contain exactly idempotency_key and opportunity",
+                                Retryability.NOT_RETRYABLE)
+        idempotency_key = payload["idempotency_key"]
+        if (not isinstance(idempotency_key, str) or not _SOURCE_EVENT_KEY.fullmatch(idempotency_key)
+                or len(idempotency_key.split(":")) < 3):
+            return self._result(context, started, ResultState.FAILURE, "INVALID_OPPORTUNITY",
+                                "idempotency_key must be an opaque namespaced source-event identity",
+                                Retryability.NOT_RETRYABLE)
+        opportunity = payload["opportunity"]
         validation_error = self._validate_opportunity(opportunity)
         if validation_error:
             return self._result(context, started, ResultState.FAILURE, "INVALID_OPPORTUNITY",
@@ -88,6 +110,10 @@ class GHLUpsertOpportunity:
             return self._result(context, started, ResultState.FAILURE, "EFFECT_GUARD_NOT_CONFIGURED",
                                 "REAL opportunity writes require the shared PostgreSQL effect guard",
                                 Retryability.NOT_RETRYABLE)
+        if self._event_ledger is None:
+            return self._result(context, started, ResultState.FAILURE, "OPPORTUNITY_LEDGER_NOT_CONFIGURED",
+                                "REAL opportunity writes require the shared PostgreSQL event ledger",
+                                Retryability.NOT_RETRYABLE)
 
         headers = {
             "Authorization": f"Bearer {self._bearer_token}",
@@ -96,27 +122,49 @@ class GHLUpsertOpportunity:
             "Content-Type": "application/json",
         }
         effect_key = self._effect_key(self.location_id, opportunity["contactId"], opportunity["pipelineId"])
+        event_key = hashlib.sha256(
+            ("ghl-v3-opportunity-upsert\0" + self.location_id + "\0" + idempotency_key).encode("utf-8")
+        ).hexdigest()
+        input_fingerprint = hashlib.sha256(
+            json.dumps(opportunity, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                       allow_nan=False).encode("utf-8")
+        ).hexdigest()
         try:
-            result = self._effect_guard.run(
-                effect_key=effect_key,
-                effect_type=self.module_id,
-                correlation_id=context.correlation_id,
-                operation=lambda: self._write_opportunity(context, started, headers, opportunity),
+            stored_result, cached = self._event_ledger.run_once(
+                event_key=event_key,
+                input_fingerprint=input_fingerprint,
+                operation=lambda: self._guarded_write(context, started, headers, opportunity, effect_key),
                 uncertain_error_code=self._uncertain_error_code,
             )
-        except EffectGuardBusy:
+            if cached:
+                result = ModuleResult(module_id=self.module_id, status=ResultState.SUCCESS,
+                                      business_result=stored_result, context=context,
+                                      started_at=started).complete()
+            else:
+                result = stored_result
+        except (EffectGuardBusy, GHLOpportunityAlreadyInProgress):
             result = self._result(context, started, ResultState.REVIEW_REQUIRED, "EFFECT_ALREADY_IN_PROGRESS",
                                   "Another run is handling this contact and pipeline; retry after it completes",
                                   Retryability.RETRYABLE)
-        except EffectReconciliationPending:
+        except (EffectReconciliationPending, GHLOpportunityReconciliationRequired):
             result = self._result(context, started, ResultState.REVIEW_REQUIRED,
                                   "EFFECT_RECONCILIATION_REQUIRED",
                                   "An earlier opportunity write has an unknown outcome; reconcile it before retrying",
                                   Retryability.NOT_RETRYABLE)
-        except EffectGuardNotConfigured:
-            result = self._result(context, started, ResultState.FAILURE, "EFFECT_GUARD_NOT_READY",
-                                  "Configure DATABASE_URL and apply the external-effect reconciliation migration",
+        except GHLOpportunityInputConflict:
+            result = self._result(context, started, ResultState.REVIEW_REQUIRED,
+                                  "OPPORTUNITY_EVENT_PAYLOAD_CONFLICT",
+                                  "This source event was already processed with different opportunity data",
                                   Retryability.NOT_RETRYABLE)
+        except (EffectGuardNotConfigured, GHLOpportunityLedgerNotConfigured):
+            result = self._result(context, started, ResultState.FAILURE, "EFFECT_GUARD_NOT_READY",
+                                  "Configure DATABASE_URL and apply migrations 003 and 009 before REAL opportunity writes",
+                                  Retryability.NOT_RETRYABLE)
+        except GHLOpportunityLedgerError:
+            result = self._result(context, started, ResultState.REVIEW_REQUIRED,
+                                  "OPPORTUNITY_LEDGER_UNAVAILABLE",
+                                  "Opportunity event ledger is unavailable; check database state before retrying",
+                                  Retryability.UNKNOWN)
         except EffectGuardUnavailable as exc:
             if exc.external_call_started:
                 result = self._result(context, started, ResultState.REVIEW_REQUIRED,
@@ -128,7 +176,41 @@ class GHLUpsertOpportunity:
                                       "PostgreSQL guard is unavailable; no provider write was started",
                                       Retryability.RETRYABLE)
         result.metrics["effect_key"] = effect_key
+        result.metrics["event_key"] = event_key
         return result
+
+    def _guarded_write(self, context: ExecutionContext, started: datetime, headers: dict[str, str],
+                       opportunity: dict[str, Any], effect_key: str) -> ModuleResult:
+        try:
+            return self._effect_guard.run(
+                effect_key=effect_key,
+                effect_type=self.module_id,
+                correlation_id=context.correlation_id,
+                operation=lambda: self._write_opportunity(context, started, headers, opportunity),
+                uncertain_error_code=self._uncertain_error_code,
+            )
+        except EffectGuardBusy:
+            return self._result(context, started, ResultState.REVIEW_REQUIRED, "EFFECT_ALREADY_IN_PROGRESS",
+                                "Another run is handling this contact and pipeline; retry after it completes",
+                                Retryability.RETRYABLE)
+        except EffectReconciliationPending:
+            return self._result(context, started, ResultState.REVIEW_REQUIRED,
+                                "EFFECT_RECONCILIATION_REQUIRED",
+                                "An earlier opportunity write has an unknown outcome; reconcile it before retrying",
+                                Retryability.NOT_RETRYABLE)
+        except EffectGuardNotConfigured:
+            return self._result(context, started, ResultState.FAILURE, "EFFECT_GUARD_NOT_READY",
+                                "Configure DATABASE_URL and apply migration 003 before REAL opportunity writes",
+                                Retryability.NOT_RETRYABLE)
+        except EffectGuardUnavailable as exc:
+            if exc.external_call_started:
+                return self._result(context, started, ResultState.REVIEW_REQUIRED,
+                                    "EFFECT_GUARD_OUTCOME_UNKNOWN",
+                                    "PostgreSQL guard failed after provider work began; reconcile before retrying",
+                                    Retryability.UNKNOWN)
+            return self._result(context, started, ResultState.FAILURE, "EFFECT_GUARD_UNAVAILABLE",
+                                "PostgreSQL guard is unavailable; no provider write was started",
+                                Retryability.RETRYABLE)
 
     def _write_opportunity(self, context: ExecutionContext, started: datetime, headers: dict[str, str],
                            opportunity: dict[str, Any]) -> ModuleResult:
@@ -189,7 +271,8 @@ class GHLUpsertOpportunity:
     def _uncertain_error_code(result: ModuleResult) -> str | None:
         if result.status == ResultState.REVIEW_REQUIRED and result.errors:
             error = result.errors[0]
-            if error.code in {"REMOTE_OUTCOME_UNKNOWN", "REMOTE_RESPONSE_UNVERIFIED"}:
+            if error.code in {"REMOTE_OUTCOME_UNKNOWN", "REMOTE_RESPONSE_UNVERIFIED",
+                              "EFFECT_GUARD_OUTCOME_UNKNOWN", "EFFECT_RECONCILIATION_REQUIRED"}:
                 return error.code
         return None
 

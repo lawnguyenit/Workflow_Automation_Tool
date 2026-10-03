@@ -11,6 +11,11 @@ Status: implemented and synthetic HTTP verified; no live HighLevel account or co
 
 ## Reliability and limits
 
+## Cost and client account
+
+- Synthetic/mock HTTP and PostgreSQL guard checks do not contact HighLevel and do not require a paid account.
+- REAL requires the client's active HighLevel Location/token. Account subscription and optional premium workflow/AI/communication features may be billed separately; review the client's billing page before enabling such features. See [HighLevel Pricing & Billing](https://help.gohighlevel.com/support/solutions/articles/155000001156-highlevel-pricing-guide).
+
 - REAL writes require `GHL_PRIVATE_INTEGRATION_TOKEN`, Location configuration, migration `003-external-effect-reconciliation.sql`, and the shared PostgreSQL effect guard. The guard serializes concurrent tag writes for one Location/contact across callers using the same DB.
 - A timeout, 5xx, malformed success response, or guard failure after provider work begins becomes an unknown effect held for reconciliation. The operator must inspect the contact's current tag list before clearing the reconciliation row or retrying.
 - The module does not claim provider-side idempotency for later repeated successful calls; the API docs describe an add operation but do not state a stable idempotency key. Confirm current tags before operator retries after any ambiguous result.
