@@ -1,0 +1,113 @@
+audit_id: AUDIT-0.12.0
+date: 2026-10-03
+status: FAILED_AUDIT
+scope:
+  target: "Full supplied Upwork lead-management brief, current reusable modules, Forms API source, n8n poller, local PostgreSQL integrations, and available user-account state."
+  auditor: "Independent read-only deliverable-auditor agent; findings reconciled by workflow lead."
+  evidence_policy: >-
+    Auditor inspected current repository artifacts and project-state records without
+    editing files, running tests, activating workflows, or calling providers. The
+    lead separately ran the recorded synthetic PostgreSQL integrations. Synthetic
+    and prior implementation-reported evidence is not live provider evidence or
+    user acceptance.
+summary: >-
+  Reusable lead modules and several bounded local PostgreSQL integrations are present,
+  but no end-to-end Forms → qualification → GHL → follow-up business run exists. The
+  selected Forms poller is inactive and uncredentialed. GHL, AI provider, sender,
+  suppression events, alert/recovery path, and handover are not composed or accepted.
+criterion_matrix:
+  - criterion: "Capture an enquiry from one configured live form or webhook"
+    result: not_tested
+    evidence:
+      - "workflows/n8n/lead-management-google-forms-api.local.json is recorded as imported, inactive, and placeholder-based."
+      - "Google Forms API is enabled in a dedicated project; Auth Platform setup is pending owner confirmation; no OAuth client, grant, request, or response read exists."
+    limitation: "The Form remains unpublished; there is no live source event."
+  - criterion: "Validate and normalize required fields; handle duplicates"
+    result: pass_bounded
+    evidence:
+      - "Synthetic Forms API mapper → lead intake → qualification/review → PostgreSQL integration returned STORED, DUPLICATE, and PAYLOAD_CONFLICT_REVIEW and removed test rows."
+      - "Synthetic checkpoint integration verified retry-safe lease, BUSY overlap, monotonic commit, stale-token rejection, expired reclaim, and one winner under concurrent acquire."
+    limitation: "Evidence covers source-event identity/storage, not person-level matching or downstream CRM/message effects."
+  - criterion: "AI extracts service, summarizes, classifies, and flags uncertainty"
+    result: not_tested_live
+    evidence:
+      - "lead.qualify module and manual-review path exist; DEC-011 defines durable event claims and a request-count limit."
+    limitation: "No owner rubric, OpenAI API credential, provider-side USD budget, or live result."
+  - criterion: "Create/update GHL contact, custom fields, tags, and opportunity"
+    result: decision_needed_not_tested_live
+    evidence:
+      - "Contact, additive tag, and opportunity adapters exist separately with synthetic provider tests."
+      - "Synthetic tag/PostgreSQL integration verified one request under same-contact concurrency and reconciliation hold after unknown outcome."
+    limitation: "No GHL account/Location, credential, approved field/tag/pipeline mapping, or composed CRM edge."
+  - criterion: "Acknowledgement/follow-up and stop on reply, booking, opt-out, or pause"
+    result: not_tested_end_to_end
+    evidence:
+      - "Standalone gate and Gmail sender modules exist. Synthetic PostgreSQL integration verified enrollment, pause/resume, terminal stops, stop-wins concurrency, and fail-closed lock timeout."
+    limitation: "No authoritative event sources, enrollment/copy/timing policy, booking link, sender credential, scheduler, or pre-send gate composition. No lead-follow-up message was sent."
+  - criterion: "Monitoring, bounded retry, alerts, recovery, and operator resolution"
+    result: fail_incomplete
+    evidence:
+      - "Some modules expose bounded retry, fail-closed, and reconciliation states."
+    limitation: "No composed lead-level alert destination, dead-letter/operator path, or end-to-end failure and recovery run."
+  - criterion: "Secret-free export, setup documentation, and handover"
+    result: partial
+    evidence:
+      - "Credential-free inactive Forms poller export and OAuth/setup documentation exist."
+    limitation: "No complete CRM/follow-up workflow export or recorded client handover; n8n local API bearer is not assigned."
+  - criterion: "One enquiry completes qualification, CRM update, and correct follow-up"
+    result: fail
+    evidence:
+      - "Current composed lead graph ends at PostgreSQL; GHL and follow-up are separate modules."
+    limitation: "No full-path source-to-follow-up execution or acceptance matrix."
+  - criterion: "User acceptance"
+    result: decision_needed
+    evidence: "No acceptance of a complete workflow is recorded."
+findings:
+  - id: AUD-01201
+    severity: high
+    disposition: open
+    title: "Full business path is not composed or demonstrated."
+    impact: "The primary Upwork outcome is unmet."
+    next_gate: "After required source/CRM/model/message access and business rules exist, compose the approved edges and run the acceptance matrix."
+  - id: AUD-01202
+    severity: high
+    disposition: blocked_by_access_and_owner_decisions
+    title: "Forms OAuth, GHL, and AI provider inputs are unavailable."
+    impact: "No live source, CRM, or model operation can be verified."
+    next_gate: "Owner confirms the outstanding Google policy checkbox and configures read-only OAuth; owner provisions GHL and AI access with approved mappings/budgets."
+  - id: AUD-01203
+    severity: high
+    disposition: open
+    title: "Follow-up suppression gate is standalone."
+    impact: "Actual sends have not been proven to stop after reply, booking, opt-out, or manual pause."
+    next_gate: "Approve event sources and message policy; connect the gate immediately before every send and verify stop paths."
+  - id: AUD-01204
+    severity: medium
+    disposition: open
+    title: "Lead-level monitoring and operator recovery remain incomplete."
+    impact: "Safe failure states may remain unnoticed or unresolved."
+    next_gate: "Choose alert destination/recovery owner; implement and exercise alert, reconciliation, and safe replay."
+  - id: AUD-01205
+    severity: medium
+    disposition: documented_risk
+    title: "Checkpoint is bounded, not exactly-once for downstream effects."
+    impact: "Lease expiry cannot cancel already-running work; replays can reach future external writers."
+    next_gate: "Keep the current low-volume bound and preserve independent idempotency/reconciliation on every remote effect."
+stale_documentation:
+  - path: "docs/modules/google-forms-api-response.md"
+    finding: "Claimed Forms API was disabled and Cloud settings unchanged."
+    status: "corrected in current working tree: dedicated project has Forms API enabled; OAuth remains unconfigured."
+  - path: "docs/modules/portfolio-modules.md"
+    finding: "Claimed the Forms poller used n8n static workflow data."
+    status: "corrected in current working tree: release 0.11 uses PostgreSQL source-poll checkpoint."
+  - path: "docs/project-state/AUDIT-0.11.0.yaml"
+    finding: "OAuth project setup predates the current Forms API enablement."
+    status: "historical audit retained; full-scope failure remains valid."
+open_owner_inputs:
+  - "Confirm Google API Services User Data Policy checkbox; then owner-controlled OAuth client/grant and private Form ID configuration."
+  - "Protected local API bearer assignment in n8n for MOCK/REAL execution."
+  - "GHL test account/Location, token scopes, identity matching, custom fields/tags, pipeline/stage and opportunity policy."
+  - "Qualification rubric, AI provider credential, privacy decision, and provider-side spend cap."
+  - "Approved message/enrollment/timing/booking policy, sender, and authoritative reply/booking/opt-out/pause events."
+  - "Alert destination, recovery owner, handover, and final acceptance."
+overall_verdict: "FAILED_AUDIT; bounded modules are useful evidence but are not a completed client workflow."
