@@ -123,3 +123,11 @@ verification_record:
     - "Google OAuth consent, Forms API response read, and execution of the imported poller."
     - "Live LLM, GHL contact/opportunity updates, outbound email/follow-up, lifecycle stop events, and client end-to-end acceptance."
     - "Production monitoring/recovery, general capacity, backup/restore, and key rotation/recovery."
+post_audit_implementation_evidence:
+  date: 2026-10-03
+  reviewer: "Implementation lead; this is an evidence update, not a second independent audit."
+  observations:
+    - "Connected Drive folder listing found the private test Form and linked response Sheet; the Form ID is intentionally not recorded in this repository."
+    - "The owner-signed-in Form editor showed five question titles matching the mapper exactly: Tên đầy đủ, Email address, Phone (optional), Service requested, and Describe your request."
+    - "The Form remains unpublished and has zero responses. Drive content fetch returned HTTP 403; no Forms API request was made."
+  effect_on_disposition: "No change. Form UI title matching narrows mapping uncertainty but does not prove Forms API OAuth, question IDs, poller execution, or the full brief."

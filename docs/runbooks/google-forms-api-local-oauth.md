@@ -35,8 +35,8 @@ After the credential is connected:
 
 1. The repository's poller export is already imported in the local n8n instance as **Lead Management — Google Forms API (private local)**. If rebuilding the instance, import `workflows/n8n/lead-management-google-forms-api.local.json`; it is kept inactive by default.
 2. Select the new OAuth credential on both Google HTTP Request nodes.
-3. Replace `REPLACE_WITH_PRIVATE_GOOGLE_FORM_ID` with the ID from the Form URL. Keep that ID in the local n8n workflow, not in committed exports or issue text.
+3. Replace `REPLACE_WITH_PRIVATE_GOOGLE_FORM_ID` with the ID from the private `Lead Intake Lab - Test Only` Form URL. The connected Drive account has already located the Form; open its edit link in the owner's browser and copy the segment between `/d/` and `/edit`. Keep that ID only in the local n8n workflow, not in committed exports or issue text.
 4. Keep the workflow inactive and run one manual test with a synthetic-only Form. The export currently uses `DRY_RUN`; it does not consume/advance the source cursor in that mode.
 5. Check the execution result and local API response before deciding whether to submit a synthetic test response. Publishing a Form can make it available to respondents; do that only when the owner intentionally chooses its audience and access settings.
 
-The repository contains a separate manual preview that uses synthetic Form data and makes no Google request. The poller is imported but has not been executed; no Google OAuth grant has been made. Its current local import has no credential or real Form ID and remains inactive.
+The repository contains a separate manual preview that uses synthetic Form data and makes no Google request. The poller is imported but has not been executed; no Google OAuth grant has been made. Its current local import has no credential or real Form ID and remains inactive. The private Form's visible question titles were checked in the owner's browser and match the mapper, but this does not verify the API's question IDs or Forms API access.
