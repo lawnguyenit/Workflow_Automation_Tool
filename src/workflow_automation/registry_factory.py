@@ -1,0 +1,76 @@
+from __future__ import annotations
+
+from workflow_automation.definitions import (
+    EXECUTOR_DEFINITIONS,
+    MODULE_DEFINITIONS,
+    MODULE_IMPLEMENTATIONS,
+    MODULE_INSTANCES,
+    PORTFOLIO_WORKFLOW,
+    PORTFOLIO_WORKFLOW_INSTANCE,
+)
+from workflow_automation.executors import PythonExecutor
+from workflow_automation.modules.input.email_ingest import EmailIngest
+from workflow_automation.modules.output.notify import NotifySend
+from workflow_automation.modules.processing.document_extract import DocumentExtract
+from workflow_automation.modules.processing.llm_structured_extract import LLMStructuredExtract
+from workflow_automation.modules.processing.validate import Validate
+from workflow_automation.modules.storage.postgres_store import PostgresStore
+from workflow_automation.registry import FrameworkRegistry
+
+
+def build_registry(additional_module_instances=None) -> FrameworkRegistry:
+    """Build the portfolio registry, applying each declared instance config."""
+    registry = FrameworkRegistry()
+    for item in MODULE_DEFINITIONS:
+        registry.add_definition(item)
+    for item in MODULE_IMPLEMENTATIONS:
+        registry.add_implementation(item)
+    for item in EXECUTOR_DEFINITIONS:
+        registry.add_executor(item)
+    registry.bind_executor("python.local", PythonExecutor())
+
+    instance_catalog = [*MODULE_INSTANCES, *(additional_module_instances or [])]
+    stores: dict[str, PostgresStore] = {}
+    for item in instance_catalog:
+        registry.add_instance(item)
+        config = item.config
+        if item.module == "email.ingest":
+            module = EmailIngest(
+                max_attachment_bytes=config.get("max_attachment_bytes", 10 * 1024 * 1024),
+                max_total_attachment_bytes=config.get("max_total_attachment_bytes", 25 * 1024 * 1024),
+                timeout_seconds=config.get("timeout_seconds", 15),
+            )
+        elif item.module == "document.extract":
+            module = DocumentExtract(
+                max_file_bytes=config.get("max_attachment_bytes", 10_000_000),
+                max_pages=config.get("max_pages", 100),
+                max_text_chars=config.get("max_text_chars", 500_000),
+            )
+        elif item.module == "llm.structured_extract":
+            module = LLMStructuredExtract(
+                model=config.get("model"), endpoint=config.get("endpoint", "https://api.openai.com/v1/responses"),
+                timeout_seconds=config.get("timeout_seconds", 30),
+            )
+        elif item.module == "data.validate":
+            module = Validate(
+                required_fields=config.get("required_fields", ["document_type", "sender", "invoice_number", "amount", "currency"]),
+                allowed_currencies=config.get("allowed_currencies"),
+                minimum_amount=config.get("minimum_amount", 0),
+                maximum_amount=config.get("maximum_amount"),
+                minimum_confidence=config.get("minimum_confidence"),
+            )
+        elif item.module == "storage.record":
+            module = PostgresStore(source_account_scope=config.get("source_account_scope"))
+            stores[item.instance_id] = module
+        elif item.module == "notify.send":
+            store_instance_id = config.get("storage_instance_id", "portfolio.postgres_store")
+            store = stores.get(store_instance_id)
+            if store is None:
+                raise ValueError(f"Notification instance {item.instance_id} references unavailable storage instance {store_instance_id}")
+            module = NotifySend(store=store, timeout_seconds=config.get("timeout_seconds", 10))
+        else:
+            raise ValueError(f"No module factory is registered for capability {item.module}")
+        registry.bind_instance_module(item.instance_id, module)
+    registry.add_workflow(PORTFOLIO_WORKFLOW)
+    registry.add_workflow_instance(PORTFOLIO_WORKFLOW_INSTANCE)
+    return registry

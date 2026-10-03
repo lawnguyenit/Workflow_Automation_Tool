@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: workflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}
+      POSTGRES_DB: workflow_automation
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./infra/postgres/00-create-n8n-db.sql:/docker-entrypoint-initdb.d/00-create-n8n-db.sql:ro
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/10-workflow-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workflow -d workflow_automation"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://workflow:${POSTGRES_PASSWORD}@postgres:5432/workflow_automation
+      WORKFLOW_API_KEY: ${WORKFLOW_API_KEY:-}
+      GOOGLE_GMAIL_ACCESS_TOKEN: ${GOOGLE_GMAIL_ACCESS_TOKEN:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+
+  n8n:
+    image: ${N8N_IMAGE:-n8nio/n8n:stable}
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: workflow
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Copy .env.example to .env and set N8N_ENCRYPTION_KEY}
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      N8N_SECURE_COOKIE: "false"
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-Asia/Saigon}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+    ports:
+      - "127.0.0.1:5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  n8n_data:

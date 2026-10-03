@@ -1,0 +1,556 @@
+{
+  "name": "Intelligent Document Intake (module-by-module safe demo)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "6a70903e-fcb0-53ad-9445-1423a4d851dd",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        220,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/v1/instances/portfolio.email_ingest/runs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\"payload\": {\"source\":\"fixture\",\"fixture_id\":\"synthetic_invoice\",\"query\":\"has:attachment\",\"max_results\":10,\"source_account\":\"\"}, \"context\": {\"workflow_id\": \"intelligent_document_intake\", \"run_id\": String($execution.id), \"correlation_id\": String($execution.id), \"attempt\": 1, \"mode\": \"DRY_RUN\"}} }}",
+        "options": {}
+      },
+      "id": "cd6c995f-0e01-5eff-a80f-22b43a01d442",
+      "name": "Email ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ec6c876d-4324-5a24-b516-60a2429da31f",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "SUCCESS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7d5b96c6-07d6-573b-bd37-ddf0516886e0",
+      "name": "Email ingest succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        650,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/v1/instances/portfolio.document_extract/runs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\"payload\": {\"items\": $json.business_result.items}, \"context\": {\"workflow_id\": \"intelligent_document_intake\", \"run_id\": String($execution.id), \"correlation_id\": String($execution.id), \"attempt\": 1, \"mode\": \"DRY_RUN\"}} }}",
+        "options": {}
+      },
+      "id": "ef57dd26-adee-502a-9883-a56d05a290ed",
+      "name": "PDF extraction",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "08e0ecc0-1a6d-5610-afce-0cc27d8e1d4c",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "SUCCESS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5e153e90-3ec3-5790-ab4b-d6e815796296",
+      "name": "PDF extraction succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        950,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/v1/instances/portfolio.llm_extract/runs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\"payload\": {\"documents\": $json.business_result.documents}, \"context\": {\"workflow_id\": \"intelligent_document_intake\", \"run_id\": String($execution.id), \"correlation_id\": String($execution.id), \"attempt\": 1, \"mode\": \"DRY_RUN\"}} }}",
+        "options": {}
+      },
+      "id": "58b4e30b-3344-5022-bdf7-72da9779c76e",
+      "name": "Structured extraction",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1060,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9ddf68ee-962e-58fe-8cc1-cea309828680",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "SUCCESS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5653195b-77f6-5847-9963-b661796d4954",
+      "name": "Structured extraction succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1250,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/v1/instances/portfolio.invoice_validate/runs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\"payload\": {\"records\": $json.business_result.records}, \"context\": {\"workflow_id\": \"intelligent_document_intake\", \"run_id\": String($execution.id), \"correlation_id\": String($execution.id), \"attempt\": 1, \"mode\": \"DRY_RUN\"}} }}",
+        "options": {}
+      },
+      "id": "df11980d-6c6f-5a24-8ef6-d7a18e10cf03",
+      "name": "Invoice validation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1360,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "890ffc79-6a8a-59da-8603-2e2d5c4bfd2f",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "SUCCESS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2f4cd924-cbfe-59ce-96d8-fcbcda27d40d",
+      "name": "Invoice validation succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1550,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/v1/instances/portfolio.postgres_store/runs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\"payload\": {\"records\": $json.business_result.records}, \"context\": {\"workflow_id\": \"intelligent_document_intake\", \"run_id\": String($execution.id), \"correlation_id\": String($execution.id), \"attempt\": 1, \"mode\": \"DRY_RUN\"}} }}",
+        "options": {}
+      },
+      "id": "75a3a947-ed39-5c2e-9eed-cb9229b2f0f0",
+      "name": "PostgreSQL preview",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1660,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9f9efc93-a2ca-55b5-b9cf-8d543c157319",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "SUCCESS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3435f016-5a41-5334-a931-875690b2581c",
+      "name": "PostgreSQL preview succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1850,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/v1/instances/portfolio.notify/runs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\"payload\": {\"records\": $json.business_result.records}, \"context\": {\"workflow_id\": \"intelligent_document_intake\", \"run_id\": String($execution.id), \"correlation_id\": String($execution.id), \"attempt\": 1, \"mode\": \"DRY_RUN\"}} }}",
+        "options": {}
+      },
+      "id": "8f86c9cb-75de-5bef-89cb-f0b9289e4a99",
+      "name": "Notification preview",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1960,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c6c51312-8608-5174-aeac-ff00328cae41",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "SUCCESS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0e66d3f6-275d-5c1f-9703-f9e0e462528c",
+      "name": "Notification preview succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2150,
+        340
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "bba7639d-b917-52df-8f2d-ca2bd402bf22",
+      "name": "Dry-run completed",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2380,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "errorType": "errorMessage",
+        "errorMessage": "A module returned a non-SUCCESS state. Review its result before continuing."
+      },
+      "id": "c11b8fc6-a8e2-52ab-91ea-20b251ae772f",
+      "name": "Stop for review",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        2050,
+        650
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Email ingest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email ingest": {
+      "main": [
+        [
+          {
+            "node": "Email ingest succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email ingest succeeded?": {
+      "main": [
+        [
+          {
+            "node": "PDF extraction",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop for review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF extraction": {
+      "main": [
+        [
+          {
+            "node": "PDF extraction succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF extraction succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Structured extraction",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop for review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured extraction": {
+      "main": [
+        [
+          {
+            "node": "Structured extraction succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured extraction succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Invoice validation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop for review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invoice validation": {
+      "main": [
+        [
+          {
+            "node": "Invoice validation succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invoice validation succeeded?": {
+      "main": [
+        [
+          {
+            "node": "PostgreSQL preview",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop for review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PostgreSQL preview": {
+      "main": [
+        [
+          {
+            "node": "PostgreSQL preview succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PostgreSQL preview succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Notification preview",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop for review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notification preview": {
+      "main": [
+        [
+          {
+            "node": "Notification preview succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notification preview succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Dry-run completed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop for review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dry-run completed": {
+      "main": [
+        []
+      ]
+    },
+    "Stop for review": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": false,
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none"
+  },
+  "versionId": "10e65659-dabf-5158-927b-f00cd2361b57",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

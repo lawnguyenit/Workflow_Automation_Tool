@@ -1,0 +1,115 @@
+from workflow_automation.models import (
+    ExecutorDefinition,
+    ModuleDefinition,
+    ModuleImplementation,
+    ModuleInstance,
+    WorkflowDefinition,
+    WorkflowInstance,
+)
+
+
+EXECUTOR_DEFINITIONS = [
+    ExecutorDefinition(executor_id="python.local", runtime="python"),
+    ExecutorDefinition(executor_id="n8n.http", runtime="http"),
+]
+
+MODULE_DEFINITIONS = [
+    ModuleDefinition(module_id="email.ingest", purpose="Read bounded email metadata and attachments.",
+                     input_schema={"type": "object", "required": ["source"]},
+                     output_schema={"type": "object", "required": ["items"]},
+                     possible_results=["SUCCESS", "PARTIAL", "FAILURE", "REVIEW_REQUIRED"]),
+    ModuleDefinition(module_id="document.extract", purpose="Extract text from supported PDF documents.",
+                     input_schema={"type": "object", "required": ["items"]},
+                     output_schema={"type": "object", "required": ["documents"]},
+                     possible_results=["SUCCESS", "PARTIAL", "FAILURE", "REVIEW_REQUIRED"]),
+    ModuleDefinition(module_id="llm.structured_extract", purpose="Extract invoice fields against a declared schema.",
+                     input_schema={"type": "object", "required": ["documents"]},
+                     output_schema={"type": "object", "required": ["records"]},
+                     possible_results=["SUCCESS", "PARTIAL", "FAILURE", "REVIEW_REQUIRED"]),
+    ModuleDefinition(module_id="data.validate", purpose="Validate extracted records against explicit business rules.",
+                     input_schema={"type": "object", "required": ["records"]},
+                     output_schema={"type": "object", "required": ["records", "rejected"]},
+                     possible_results=["SUCCESS", "PARTIAL", "FAILURE", "REVIEW_REQUIRED"]),
+    ModuleDefinition(module_id="storage.record", purpose="Persist invoice records idempotently in PostgreSQL.",
+                     input_schema={"type": "object", "required": ["records"]},
+                     output_schema={"type": "object", "required": ["records"]},
+                     possible_results=["SUCCESS", "PARTIAL", "FAILURE", "REVIEW_REQUIRED"]),
+    ModuleDefinition(module_id="notify.send", purpose="Create a bounded notification event for persisted records.",
+                     input_schema={"type": "object", "required": ["records"]},
+                     output_schema={"type": "object", "required": ["notifications"]},
+                     possible_results=["SUCCESS", "PARTIAL", "FAILURE", "REVIEW_REQUIRED"]),
+]
+
+MODULE_IMPLEMENTATIONS = [
+    ModuleImplementation(implementation_id="email.ingest.python.reference.v1", implements="email.ingest",
+                         runtime="python", provider="synthetic fixture or Gmail REST API",
+                         limitations=["Live access requires a read-only OAuth access token and stable account scope."]),
+    ModuleImplementation(implementation_id="document.extract.pypdf.v1", implements="document.extract",
+                         runtime="python", provider="pypdf",
+                         limitations=["Image-only scanned PDFs need OCR; this implementation does not claim OCR."]),
+    ModuleImplementation(implementation_id="llm.structured_extract.python.reference.v1", implements="llm.structured_extract",
+                         runtime="python", provider="deterministic fixture or OpenAI Responses API",
+                         limitations=["Mock results verify wiring, not model quality; live calls require configured credentials."]),
+    ModuleImplementation(implementation_id="data.validate.python.v1", implements="data.validate", runtime="python"),
+    ModuleImplementation(implementation_id="storage.record.postgres.v1", implements="storage.record",
+                         runtime="python", provider="PostgreSQL"),
+    ModuleImplementation(implementation_id="notify.send.python.reference.v1", implements="notify.send", runtime="python",
+                         provider="durable mock outbox or Slack incoming webhook",
+                         limitations=["Slack delivery is not exactly-once; timeout outcomes are not retried automatically."]),
+]
+
+MODULE_INSTANCES = [
+    ModuleInstance(instance_id="portfolio.email_ingest", module="email.ingest",
+                   implementation="email.ingest.python.reference.v1", executor_id="python.local",
+                   config={"source": "fixture"}),
+    ModuleInstance(instance_id="portfolio.document_extract", module="document.extract",
+                   implementation="document.extract.pypdf.v1", executor_id="python.local",
+                   config={"max_attachment_bytes": 10_000_000, "max_pages": 50}),
+    ModuleInstance(instance_id="portfolio.llm_extract", module="llm.structured_extract",
+                   implementation="llm.structured_extract.python.reference.v1", executor_id="python.local",
+                   config={"provider": "mock"}),
+    ModuleInstance(instance_id="portfolio.invoice_validate", module="data.validate",
+                   implementation="data.validate.python.v1", executor_id="python.local",
+                   config={"required_fields": ["invoice_number", "amount", "currency"]}),
+    ModuleInstance(instance_id="portfolio.postgres_store", module="storage.record",
+                   implementation="storage.record.postgres.v1", executor_id="python.local"),
+    ModuleInstance(instance_id="portfolio.notify", module="notify.send",
+                   implementation="notify.send.python.reference.v1", executor_id="python.local",
+                   config={"provider": "mock"}),
+]
+
+PORTFOLIO_WORKFLOW = WorkflowDefinition(
+    workflow_id="intelligent_document_intake",
+    version="1",
+    description="Fixture-first email attachment intake, extraction, validation, persistence, and notification.",
+    steps=[
+        {"step_id": "email", "module_id": "email.ingest",
+         "input_mapping": {"source": "$input.source", "fixture_id": "$input.fixture_id",
+                           "query": "$input.query", "max_results": "$input.max_results",
+                           "source_account": "$input.source_account"}},
+        {"step_id": "document", "module_id": "document.extract",
+         "depends_on": ["email"], "input_mapping": {"items": "email.items"}},
+        {"step_id": "extract", "module_id": "llm.structured_extract",
+         "depends_on": ["document"], "input_mapping": {"documents": "document.documents"}},
+        {"step_id": "validate", "module_id": "data.validate",
+         "depends_on": ["extract"], "input_mapping": {"records": "extract.records"}},
+        {"step_id": "store", "module_id": "storage.record",
+         "depends_on": ["validate"], "input_mapping": {"records": "validate.records"}},
+        {"step_id": "notify", "module_id": "notify.send",
+         "depends_on": ["store"], "input_mapping": {"records": "store.records"}},
+    ],
+)
+
+PORTFOLIO_WORKFLOW_INSTANCE = WorkflowInstance(
+    instance_id="portfolio.intelligent_document_intake",
+    workflow_definition_id="intelligent_document_intake",
+    description="Synthetic reference bindings for the reusable intake graph.",
+    step_bindings={
+        "email": "portfolio.email_ingest",
+        "document": "portfolio.document_extract",
+        "extract": "portfolio.llm_extract",
+        "validate": "portfolio.invoice_validate",
+        "store": "portfolio.postgres_store",
+        "notify": "portfolio.notify",
+    },
+)
