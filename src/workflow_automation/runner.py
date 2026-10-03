@@ -44,6 +44,12 @@ class WorkflowRunner:
                 completed_steps.add(step.step_id)
 
         for step in ordered:
+            failed_requirements = [
+                required for required in step.requires_success_of
+                if required not in results or results[required].status != ResultState.SUCCESS
+            ]
+            if failed_requirements:
+                continue
             module_instance_id = workflow_instance.step_bindings[step.step_id]
             instance = self.registry.instances[module_instance_id]
             try:
@@ -78,8 +84,23 @@ class WorkflowRunner:
             if result.status == ResultState.PARTIAL and not step.continue_on_partial:
                 break
 
-        final = results[ordered[len(results) - 1].step_id] if results else None
-        overall = ResultState.SUCCESS if final is None else final.status
+        final = next((results[step.step_id] for step in reversed(ordered)
+                      if step.step_id in results), None)
+        status_precedence = {
+            ResultState.SUCCESS: 0,
+            ResultState.PARTIAL: 1,
+            ResultState.REVIEW_REQUIRED: 2,
+            ResultState.FAILURE: 3,
+        }
+        overall = max((item.status for item in results.values()),
+                      key=lambda status: status_precedence[status],
+                      default=ResultState.SUCCESS)
+        gated_steps = {
+            step.step_id: [required for required in step.requires_success_of
+                           if required not in results or results[required].status != ResultState.SUCCESS]
+            for step in ordered
+            if step.step_id not in results and step.requires_success_of
+        }
         return {
             "workflow_id": workflow.workflow_id,
             "workflow_instance_id": workflow_instance.instance_id,
@@ -88,5 +109,6 @@ class WorkflowRunner:
             "context": context.model_dump(mode="json"),
             "steps": {step_id: result.model_dump(mode="json") for step_id, result in results.items()},
             "skipped_steps": [step.step_id for step in ordered if step.step_id not in results],
+            "gated_steps": gated_steps,
             "result": None if final is None else final.business_result,
         }

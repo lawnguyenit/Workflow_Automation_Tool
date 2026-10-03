@@ -73,3 +73,12 @@ decisions:
     evidence_or_rationale: "Explicit Upwork brief requirement and implemented qualification contract."
     date: 2026-10-03
     supersedes: null
+  - id: DEC-JOB-009
+    question: "How should workflow dependencies behave when a side-effect step follows an uncertain/review result?"
+    options_considered: ["Always run in topological order", "Explicit success gate on selected dependencies and severity-preserving overall status"]
+    decision: "Use explicit `requires_success_of` on steps that must not run after review/partial results; aggregate workflow status by highest severity among executed steps. Store/review steps can still run without this gate when their contract allows it."
+    status: approved
+    owner: workflow lead
+    evidence_or_rationale: "This is a technical control flow choice that implements the approved fail-closed manual-review intent; it does not choose qualification labels, CRM mappings, or message policy."
+    date: 2026-10-03
+    supersedes: null

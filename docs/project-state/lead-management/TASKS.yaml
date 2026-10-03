@@ -129,10 +129,25 @@ tasks:
     expected_output: "Independent criterion matrix and explicit pass/fail/unknown decision."
     owner: independent deliverable auditor
     allowed_files: ["docs/project-state/lead-management/"]
-    dependencies: [TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008]
+    dependencies: [TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-010]
     preconditions: ["Build and owner-approved acceptance runs completed"]
     must_not_change: ["Auditor is read-only and does not call providers."]
     blocking_or_stop_condition: "Any required criterion lacking evidence keeps the overall audit failed/incomplete."
     acceptance_checks: ["Full source-to-follow-up path independently inspected", "fresh live and failure-recovery evidence classified", "user acceptance separate"]
-    verification: ["Current preliminary audit: docs/project-state/AUDIT-0.12.0.yaml (FAILED_AUDIT)."]
+    verification: ["Current independent audit: docs/project-state/AUDIT-0.13.0.yaml (FAILED_AUDIT); no owner-approved live acceptance run exists."]
     status: blocked
+  - id: TASK-010
+    caller: workflow lead
+    callee: workflow lead
+    objective: "Add generic workflow success gating and severity-preserving status aggregation for safe future CRM/follow-up composition."
+    inputs: ["DEC-JOB-008", "DEC-JOB-009", "CAP-010", "source/workflow runner evidence"]
+    expected_output: "Backward-compatible WorkflowStep gate contract, runner/registry implementation, tests, release notes, and updated pipeline evidence."
+    owner: workflow lead
+    allowed_files: ["src/workflow_automation/models.py", "src/workflow_automation/registry.py", "src/workflow_automation/runner.py", "tests/unit/test_framework_core.py", "docs/module-contract.md", "docs/project-state/lead-management/"]
+    dependencies: []
+    preconditions: ["No change to owner-defined qualification or CRM/follow-up business policies"]
+    must_not_change: ["Existing steps run unchanged unless a success gate is explicitly declared", "No external side effects during verification"]
+    blocking_or_stop_condition: "If result precedence or gate semantics conflict with approved module contracts, stop and resolve the contract before composing effects."
+    acceptance_checks: ["Review result is stored while a gated CRM-like step is skipped", "fully successful path invokes downstream step", "registry rejects gate references that are not dependencies", "aggregate status preserves earlier non-success outcomes"]
+    verification: ["uv run pytest -q tests/unit/test_framework_core.py tests/unit/test_api.py tests/unit/test_registry_factory.py: 30 passed; full suite 193 passed"]
+    status: completed

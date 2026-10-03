@@ -90,6 +90,13 @@ class FrameworkRegistry:
                     raise ValueError(f"Unknown dependency {dependency!r} in step {step.step_id}")
                 if dependency == step.step_id:
                     raise ValueError(f"Workflow step cannot depend on itself: {step.step_id}")
+            if len(set(step.requires_success_of)) != len(step.requires_success_of):
+                raise ValueError(f"Workflow step has duplicate success requirements: {step.step_id}")
+            for required_step in step.requires_success_of:
+                if required_step not in step.depends_on:
+                    raise ValueError(
+                        f"Step {step.step_id} must depend on {required_step!r} before requiring its success"
+                    )
             for reference in step.input_mapping.values():
                 source = reference.split(".", 1)[0]
                 if source == "$input":

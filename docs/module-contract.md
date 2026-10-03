@@ -94,6 +94,8 @@ Do not use generic statements such as “exactly once”, “no duplicates”, �
 - Make schema changes explicit and versioned. Document breaking changes and migration requirements.
 - Keep business decisions (for example, identity key, conflict winner, acceptable extraction confidence, or notification policy) configurable and visible; do not silently guess them in generic modules.
 - Keep cross-cutting policies attachable to the stages that need them; infrastructure should not be duplicated as if it were a business-data stage.
+- Workflow dependencies express execution order. A step may additionally require named dependency steps to have `SUCCESS`; if any requirement is missing or non-success, that step is skipped and the result reports its unmet gate. Use this for side effects that must not run after review/partial results.
+- Workflow status preserves the highest-severity executed result (`FAILURE` > `REVIEW_REQUIRED` > `PARTIAL` > `SUCCESS`), even when a later persistence/cleanup step succeeds. `result` still contains the business output from the last executed step.
 
 ## 6. Verification expectations for future implementations
 

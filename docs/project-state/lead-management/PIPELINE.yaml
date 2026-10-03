@@ -24,10 +24,10 @@ acceptance_mapping:
     capability_ids: [CAP-009]
     checks: ["provider/DB/LLM fault injection", "alert delivery", "operator reconciliation and safe replay"]
   - criterion_id: AC-008
-    capability_ids: [CAP-001, CAP-006, CAP-008, CAP-009]
+    capability_ids: [CAP-001, CAP-006, CAP-008, CAP-009, CAP-010]
     checks: ["secret scan of all workflow exports", "clean setup exercise", "handover artifact"]
   - criterion_id: AC-009
-    capability_ids: [CAP-001, CAP-002, CAP-003, CAP-004, CAP-005, CAP-006, CAP-007, CAP-008, CAP-009]
+    capability_ids: [CAP-001, CAP-002, CAP-003, CAP-004, CAP-005, CAP-006, CAP-007, CAP-008, CAP-009, CAP-010]
     checks: ["one complete synthetic owner-account run", "failure/recovery matrix", "user acceptance"]
 capabilities:
   - id: CAP-001
@@ -156,6 +156,20 @@ capabilities:
       side_effects_permissions_and_limits: ["No current composition or named owner", "recovery path not exercised"]
       dependencies_and_compatibility: ["Existing notification outbox; additional composition/configuration required"]
       verification: ["missing end-to-end failure/recovery exercise"]
+  - id: CAP-010
+    purpose: "Preserve the most severe workflow result and prevent downstream side effects unless required dependency steps succeeded."
+    implementation_source: "src/workflow_automation/models.py WorkflowStep.requires_success_of; src/workflow_automation/runner.py; docs/module-contract.md"
+    classification: reuse
+    evidence: ["framework tests verify partial review is persisted, downstream side effect is gated, success path executes, and aggregate status preserves PARTIAL"]
+    module_contract:
+      input: "Workflow DAG with named dependencies and optional required-success dependencies."
+      output: "Executed step results, explicit gated-step reasons, and aggregate status by severity."
+      assumptions_and_preconditions: ["Every success gate names an ordering dependency", "business-specific recovery and review actions remain separate steps/policies"]
+      postconditions: ["A gated step is not invoked unless every required step executed with SUCCESS", "later successful cleanup/persistence cannot downgrade an earlier failure/review/partial result"]
+      failures_and_partial_results: ["Skipped side-effect steps are reported in skipped_steps and gated_steps", "the last executed business result is preserved separately from aggregate status"]
+      side_effects_permissions_and_limits: ["No new external provider calls", "no scheduler or rollback semantics"]
+      dependencies_and_compatibility: ["Framework WorkflowStep/WorkflowRunner; existing step definitions remain backward compatible by default"]
+      verification: ["Unit-level runner/registry tests; no GHL/follow-up composed path yet"]
 edges:
   - id: EDGE-001
     producer: CAP-001

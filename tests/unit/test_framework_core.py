@@ -24,6 +24,19 @@ class EchoModule:
                             business_result={"value": payload["value"] + 1}, context=context).complete()
 
 
+class ResultModule:
+    def __init__(self, module_id, status, calls):
+        self.module_id = module_id
+        self.status = status
+        self.calls = calls
+
+    def execute(self, payload, context):
+        self.calls.append(self.module_id)
+        return ModuleResult(module_id=self.module_id, status=self.status,
+                            business_result={"value": payload.get("value", 7)},
+                            context=context).complete()
+
+
 def registry_with_echo() -> FrameworkRegistry:
     registry = FrameworkRegistry()
     registry.add_definition(ModuleDefinition(module_id="test.echo", purpose="test",
@@ -74,6 +87,85 @@ def test_registry_rejects_cycles():
         registry.add_workflow(WorkflowDefinition(workflow_id="invalid.cycle", description="test", steps=[
             {"step_id": "first", "module_id": "test.echo", "depends_on": ["second"]},
             {"step_id": "second", "module_id": "test.echo", "depends_on": ["first"]},
+        ]))
+
+
+def registry_with_review_gate(*, qualification_status=ResultState.PARTIAL):
+    registry = FrameworkRegistry()
+    registry.add_executor(ExecutorDefinition(executor_id="python.local", runtime="python"))
+    registry.bind_executor("python.local", PythonExecutor())
+    calls = []
+    modules = [
+        ("source", ResultState.SUCCESS),
+        ("persist", ResultState.SUCCESS),
+        ("qualify", qualification_status),
+        ("crm", ResultState.SUCCESS),
+    ]
+    bindings = {}
+    for name, status in modules:
+        capability = f"test.{name}"
+        implementation = f"{capability}.python"
+        instance_id = name
+        registry.add_definition(ModuleDefinition(
+            module_id=capability, purpose="test", input_schema={"type": "object"},
+            output_schema={"type": "object"}, possible_results=["SUCCESS", "PARTIAL"],
+        ))
+        registry.add_implementation(ModuleImplementation(
+            implementation_id=implementation, implements=capability, runtime="python",
+        ))
+        registry.add_instance(ModuleInstance(
+            instance_id=instance_id, module=capability, implementation=implementation,
+            executor_id="python.local",
+        ))
+        registry.bind_instance_module(instance_id, ResultModule(capability, status, calls))
+        bindings[name] = instance_id
+
+    registry.add_workflow(WorkflowDefinition(workflow_id="lead.gated", description="test", steps=[
+        {"step_id": "source", "module_id": "test.source"},
+        {"step_id": "persist", "module_id": "test.persist", "depends_on": ["source"],
+         "continue_on_partial": True, "input_mapping": {"value": "source.value"}},
+        {"step_id": "qualify", "module_id": "test.qualify", "depends_on": ["persist"],
+         "continue_on_partial": True, "input_mapping": {"value": "persist.value"}},
+        {"step_id": "crm", "module_id": "test.crm", "depends_on": ["persist", "qualify"],
+         "requires_success_of": ["qualify"], "input_mapping": {"value": "persist.value"}},
+    ]))
+    registry.add_workflow_instance(WorkflowInstance(
+        instance_id="lead.gated.instance", workflow_definition_id="lead.gated",
+        step_bindings=bindings,
+    ))
+    return registry, calls
+
+
+def test_runner_persists_review_path_but_gates_downstream_side_effects():
+    registry, calls = registry_with_review_gate()
+    result = WorkflowRunner(registry).run(
+        "lead.gated.instance", {}, ExecutionContext(workflow_id="lead.gated", mode=RunMode.MOCK),
+    )
+
+    assert result["status"] == "PARTIAL"
+    assert result["steps"]["persist"]["status"] == "SUCCESS"
+    assert result["skipped_steps"] == ["crm"]
+    assert result["gated_steps"] == {"crm": ["qualify"]}
+    assert calls == ["test.source", "test.persist", "test.qualify"]
+
+
+def test_runner_invokes_downstream_step_after_success_requirement_passes():
+    registry, calls = registry_with_review_gate(qualification_status=ResultState.SUCCESS)
+    result = WorkflowRunner(registry).run(
+        "lead.gated.instance", {}, ExecutionContext(workflow_id="lead.gated", mode=RunMode.MOCK),
+    )
+
+    assert result["status"] == "SUCCESS"
+    assert result["gated_steps"] == {}
+    assert "test.crm" in calls
+
+
+def test_registry_requires_success_condition_to_reference_a_dependency():
+    registry = registry_with_echo()
+    with pytest.raises(ValueError, match="must depend on"):
+        registry.add_workflow(WorkflowDefinition(workflow_id="invalid.gate", description="test", steps=[
+            {"step_id": "first", "module_id": "test.echo"},
+            {"step_id": "second", "module_id": "test.echo", "requires_success_of": ["first"]},
         ]))
 
 

@@ -1,0 +1,157 @@
+job_id: portfolio-lead-management-upwork-brief
+auditor: independent deliverable auditor (read-only)
+last_updated: 2026-10-03
+independent_of_implementation: true
+criteria:
+  - id: AC-001
+    result: not_tested
+    evidence:
+      - "workflows/n8n/lead-management-google-forms-api.local.json remains inactive, contains REPLACE_WITH_PRIVATE_GOOGLE_FORM_ID, has no OAuth credential, and uses DRY_RUN."
+      - "Current account state: Forms API enabled and External/Testing branding configured after policy acceptance; no Forms scopes, OAuth client/grant, Forms API request, or response read."
+    limitation: "Private Form is unpublished and has zero responses; current-vs-dedicated Google account scope boundary is unresolved."
+    owner_next_action: "User chooses the Google account boundary; user creates/enters OAuth credentials in protected UIs; then verify only Forms read-only scopes and run against synthetic Form data."
+  - id: AC-002
+    result: pass
+    evidence:
+      - "Unit and synthetic Forms mapper/intake/store checks cover normalized fields, missing/invalid data, duplicate source events, and changed-payload review."
+      - "docs/project-state/verification.md records the latest synthetic PostgreSQL integration outcomes and cleanup."
+    limitation: "No live Form schema/question-ID or response mapping has been verified; this is bounded local evidence."
+    owner_next_action: "After OAuth access, run the complete validation matrix against the owner's synthetic response."
+  - id: AC-003
+    result: decision_needed
+    evidence:
+      - "lead.qualify implements strict structured output and fail-closed manual review; unit and qualification-ledger synthetic checks exist."
+      - "docs/project-state/lead-management/DECISIONS.yaml DEC-JOB-006 remains unresolved."
+    limitation: "No owner rubric/labels, OpenAI API credential, provider-side USD cap, or live model request."
+    owner_next_action: "User decides API billing/spend and approves rubric/privacy inputs before any live model call."
+  - id: AC-004
+    result: decision_needed
+    evidence:
+      - "GHL contact, additive tags, and opportunity adapters exist with synthetic HTTP/guard checks."
+      - "The active lead workflow in src/workflow_automation/definitions.py ends at map → intake → qualify → store; GHL adapters are not bound into it."
+    limitation: "No GHL account/Location, approved duplicate/field/tag/pipeline/stage rules, composed edge, or live write."
+    owner_next_action: "User supplies a test Location and approves account mappings; workflow lead then composes and exercises the guarded CRM path."
+  - id: AC-005
+    result: decision_needed
+    evidence:
+      - "Standalone follow-up gate and Gmail outbox modules have synthetic tests; gate PostgreSQL integration covers stop/pause states."
+      - "The active lead workflow has no gate-before-send path or authoritative lifecycle-event producer."
+    limitation: "No approved enrollment/consent, content, cadence, booking link, stop-event producer, sender credential, or authorized test send; the earlier one-time self-send permission is consumed."
+    owner_next_action: "User approves follow-up policy and target test; then compose the gate immediately before every send and verify stop conditions."
+  - id: AC-006
+    result: pass
+    evidence:
+      - "Synthetic PostgreSQL and adapter checks cover source checkpoint/store idempotency, qualification ledger/reconciliation, selected GHL effect guards, suppression state, and Gmail outbox behavior."
+      - "Release 0.13.0 tests generic success-gated side-effect skipping and severity-preserving workflow status."
+    limitation: "No integrated n8n replay or live provider concurrency/unknown-outcome run; the new gate is not used in the lead graph."
+    owner_next_action: "Apply the gate to approved downstream steps and exercise replay/concurrency against owner-controlled test accounts."
+  - id: AC-007
+    result: risk
+    evidence:
+      - "Release 0.12.0 incident log has synthetic Compose PostgreSQL/FastAPI evidence for sanitized API-run incidents, list/detail/acknowledgement, and cleanup."
+      - "docs/modules/workflow-incident-log.md documents best-effort persistence and no alert/retry/DLQ behavior."
+    limitation: "No alert delivery or end-to-end recovery; API hooks miss n8n failures outside the API calls; resolution is acknowledgement only, and database outage can lose an incident."
+    owner_next_action: "User chooses alert destination/recovery owner; workflow lead adds external n8n error capture and a tested reconciliation/replay path."
+  - id: AC-008
+    result: risk
+    evidence:
+      - "Credential-free inactive Forms exports and setup/module docs exist."
+      - "n8n export contains no API bearer credential, and current credential binding/clean setup/handover are unverified."
+    limitation: "There is no complete CRM/follow-up export or recorded handover."
+    owner_next_action: "Configure credentials through protected UIs only after owner access decisions; perform clean setup and handover review."
+  - id: AC-009
+    result: fail
+    evidence:
+      - "Current Forms API workflow composition ends at local PostgreSQL storage; no source-to-model-to-GHL-to-follow-up run exists."
+      - "Release 0.13.0 success-gate capability exists only in generic runner tests and is absent from definitions.py and n8n exports."
+    limitation: "No complete synthetic owner-account acceptance run or user acceptance."
+    owner_next_action: "Resolve account/business-policy gates, compose approved edges, execute the full acceptance matrix, then request user acceptance."
+  - id: USER-ACCEPTANCE
+    result: decision_needed
+    evidence: ["No complete workflow acceptance is recorded."]
+    limitation: "User acceptance cannot be inferred from local module or mock tests."
+    owner_next_action: "User reviews the completed workflow and handover after end-to-end evidence exists."
+modules:
+  - id: source.google_forms_api_response
+    result: pass
+    evidence: ["Synthetic mapper tests/integration; live Forms response not read."]
+  - id: lead.intake
+    result: pass
+    evidence: ["Unit and synthetic composition; required-field review behavior covered."]
+  - id: lead.qualify
+    result: risk
+    evidence: ["Strict structured-output and synthetic ledger tests; live rubric/provider absent."]
+  - id: lead.store
+    result: pass
+    evidence: ["Synthetic Compose PostgreSQL duplicate/conflict integration."]
+  - id: crm.ghl_upsert_contact / crm.ghl_contact_tags / crm.ghl_upsert_opportunity
+    result: risk
+    evidence: ["Synthetic adapter tests only; these steps are not composed into the lead workflow."]
+  - id: lead.followup_gate / gmail.send
+    result: risk
+    evidence: ["Synthetic state/outbox tests only; no pre-send composition or live send."]
+  - id: workflow.incident_log
+    result: pass
+    evidence: ["Synthetic PostgreSQL/FastAPI integration; covers API-run incidents only and is best effort."]
+  - id: workflow.success_gating
+    result: pass
+    evidence: ["Generic synthetic runner/registry tests; not applied to a production lead edge."]
+composition_edges:
+  - producer: Forms API response mapping
+    consumer: lead normalization
+    result: pass
+    limitation: "Synthetic only; live Forms schema unverified."
+  - producer: lead normalization
+    consumer: qualification
+    result: pass
+    limitation: "Synthetic results; owner rubric/live model absent."
+  - producer: qualification
+    consumer: local PostgreSQL lead store
+    result: pass
+    limitation: "Synthetic DB integration; external CRM effects are not part of this edge."
+  - producer: local lead store
+    consumer: GHL contact/tags/opportunity
+    result: not_tested
+    limitation: "No workflow edge or owner account mapping exists."
+  - producer: GHL update and approved enrollment
+    consumer: suppression gate and Gmail sender
+    result: not_tested
+    limitation: "No composed edge, stop-event source, message policy, or live sender credential."
+end_to_end:
+  result: fail
+  evidence: ["Independent source review of active definitions and n8n export; latest verification records contain no complete source-to-follow-up run."]
+  limits: ["No live Forms API, model, GHL, lead email, or user acceptance evidence."]
+failure_report_applicability:
+  - "Incident API records bounded failures from calls that reach the FastAPI workflow/module routes."
+  - "n8n failures outside those API calls are not captured by the incident log."
+  - "No alert, automatic retry, DLQ, or tested recovery/replay path exists."
+output_integrity:
+  - "Forms exports reviewed as inactive and credential-free in the recorded verification; live credential binding absent."
+  - "No full CRM/follow-up export or recorded handover."
+blocking_findings:
+  - id: AUD-01301
+    severity: high
+    title: "The end-to-end business workflow is not composed."
+    evidence: "Active definitions and n8n poller end after local PostgreSQL; the generic 0.13 gate is not applied to the lead graph."
+    impact: "GHL and correct follow-up acceptance criteria remain unmet."
+    next_action: "After owner decisions/access, compose CRM/gate/sender with independent idempotency and source-checkpoint recovery."
+  - id: AUD-01302
+    severity: high
+    title: "Required owner account and business decisions remain open."
+    evidence: "JOB_SPEC.yaml UNK-001 through UNK-005 and DECISIONS.yaml DEC-JOB-005/006/007."
+    impact: "Live source, GHL, model billing, messaging, and alert behavior cannot be safely selected or verified."
+    next_action: "Obtain Google account-scope choice; GHL test account/mappings; AI billing/rubric; follow-up policy/sender; alert/recovery owner."
+  - id: AUD-01303
+    severity: medium
+    title: "Incident logging does not capture n8n-only failures or deliver alerts/recovery."
+    evidence: "Incident writes are hooked only to API routes; docs/module contract states best effort and acknowledgement only."
+    impact: "Some orchestration failures can remain unrecorded and unnoticed."
+    next_action: "Implement authenticated n8n error ingestion and owner-approved alert/replay integration."
+non_blocking_risks:
+  - "The 900-second source lease cannot cancel already-running downstream work; replay safety requires independent guards per remote effect."
+  - "Release 0.13 success-gate behavior is tested only on a synthetic generic graph, not the active Forms workflow."
+user_review_items:
+  - "Choose whether Forms read-only scopes attach to the current Google account or a dedicated test account."
+  - "Provide/approve GHL, qualification billing/rubric, follow-up and alert/recovery configuration before live effects."
+  - "Review and accept only after full end-to-end evidence and handover exist."
+recommendation: FAILED_AUDIT

@@ -1,4 +1,15 @@
-## Current release 0.12.0 — PII-minimized workflow incident log
+## Current release 0.13.0 — Workflow success gates
+
+Release 0.13.0 adds explicit success-gated workflow steps and severity-preserving aggregate status. It does not complete the supplied Upwork lead-management brief.
+
+### Workflow runner control flow — 2026-10-03
+
+- Focused runner/API/registry checks: **30 passed**, one existing Starlette/httpx deprecation warning.
+- Full repository suite: **193 passed**, one existing deprecation warning.
+- Synthetic runner test verified that a `PARTIAL` qualification result can be persisted, a downstream CRM-like step requiring successful qualification is skipped with an explicit gate reason, and the overall workflow remains `PARTIAL`. A successful qualification allowed the downstream step to execute. Registry rejected a success gate that did not name an ordering dependency.
+- No GHL, Forms, OpenAI, Gmail, or other external provider was called. No actual lead GHL/follow-up step exists in the current graph.
+
+### Prior release 0.12.0 — PII-minimized workflow incident log
 
 Release 0.12.0 adds cross-cutting incident recording and operator acknowledgement. It does not complete the supplied Upwork lead-management brief.
 

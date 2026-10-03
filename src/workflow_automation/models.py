@@ -53,6 +53,7 @@ class WorkflowStep(BaseModel):
     input_mapping: dict[str, str] = Field(default_factory=dict)
     depends_on: list[str] = Field(default_factory=list)
     continue_on_partial: bool = False
+    requires_success_of: list[str] = Field(default_factory=list)
 
 
 class WorkflowDefinition(BaseModel):
