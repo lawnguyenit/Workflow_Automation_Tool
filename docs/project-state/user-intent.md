@@ -11,6 +11,7 @@
 - Carefully surface concerns such as duplicate processing, concurrent database writes, overload, retry behavior, and debugging/operability.
 - Leave enough bounded, sanitized diagnostic information to debug workflows when the user has no direct system access or only receives workflow nodes/configuration from the client.
 - Describe modules in Git updates so maintainers can see their contents, guarantees, and common user concerns.
+- For any real job that requires a capability not yet in the reusable catalog, complete the client work and then create a generalized reusable module in the appropriate tool project before closing the job; do not leave the capability as a client-only one-off.
 - A shared read-only research agent at `../.codex/agents/workflow-module-risk-researcher.toml` checks bounded concerns against current online sources and reports gaps; the established workflow remains unchanged.
 
 ## Assumptions to revisit
