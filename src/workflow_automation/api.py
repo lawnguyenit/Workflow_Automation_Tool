@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
+from workflow_automation import __version__
 from workflow_automation.contracts import ExecutionContext, ModuleError, ModuleResult, ResultState, Retryability, RunMode
 from workflow_automation.registry_factory import build_registry
 from workflow_automation.runner import WorkflowRunner
@@ -68,7 +69,7 @@ class WorkflowRunRequest(BaseModel):
 def create_app() -> FastAPI:
     registry = build_registry()
     runner = WorkflowRunner(registry)
-    app = FastAPI(title="Workflow Automation Module API", version="0.9.0")
+    app = FastAPI(title="Workflow Automation Module API", version=__version__)
     app.state.registry = registry
     app.state.runner = runner
 

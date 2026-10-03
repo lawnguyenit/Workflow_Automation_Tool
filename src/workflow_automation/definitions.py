@@ -62,6 +62,10 @@ MODULE_DEFINITIONS = [
                      input_schema={"type": "object", "required": ["lead"]},
                      output_schema={"type": "object", "required": ["state", "duplicate"]},
                      possible_results=["SUCCESS", "PARTIAL", "FAILURE", "REVIEW_REQUIRED"]),
+    ModuleDefinition(module_id="lead.followup_gate", purpose="Fail-closed durable gate that blocks follow-up after reply, booking, opt-out, or manual pause.",
+                     input_schema={"type": "object", "required": ["operation", "subject_scope", "subject_id"]},
+                     output_schema={"type": "object", "required": ["state", "can_send", "reason"]},
+                     possible_results=["SUCCESS", "FAILURE", "REVIEW_REQUIRED"]),
     ModuleDefinition(module_id="crm.ghl_upsert_contact", purpose="Create or update one GoHighLevel contact using its Location duplicate policy.",
                      input_schema={"type": "object", "required": ["contact"]},
                      output_schema={"type": "object", "required": ["state", "contact_id", "new"]},
@@ -118,6 +122,13 @@ MODULE_IMPLEMENTATIONS = [
     ModuleImplementation(implementation_id="lead.store.postgres.v1", implements="lead.store", runtime="python",
                          provider="PostgreSQL",
                          limitations=["Dedupe scope is source event only; this is not CRM contact or outbound message deduplication."]),
+    ModuleImplementation(implementation_id="lead.followup_gate.postgres.v1", implements="lead.followup_gate",
+                         runtime="python", provider="PostgreSQL",
+                         limitations=["Missing state blocks sending until an explicit enrollment event.",
+                                       "MOCK/REAL require a stable FOLLOWUP_IDENTITY_HMAC_KEY of at least 32 bytes; rotation requires state migration.",
+                                       "Every send caller must check immediately before sending; an in-flight provider request cannot be cancelled.",
+                                       "Reply, booking, and opt-out stops are terminal; a manual resume can clear only the exact current pause event.",
+                                       "No event source, schedule, message sender, alert, or client-specific policy is configured."]),
     ModuleImplementation(implementation_id="crm.ghl_upsert_contact.http.v1", implements="crm.ghl_upsert_contact",
                          runtime="python", provider="GoHighLevel API v3",
                          limitations=["Contact matching follows per-Location duplicate settings; this module does not promise exactly-once writes.",
@@ -170,6 +181,8 @@ MODULE_INSTANCES = [
                    implementation="lead.qualify.openai.v1", executor_id="python.local"),
     ModuleInstance(instance_id="portfolio.lead_store", module="lead.store",
                    implementation="lead.store.postgres.v1", executor_id="python.local"),
+    ModuleInstance(instance_id="portfolio.lead_followup_gate", module="lead.followup_gate",
+                   implementation="lead.followup_gate.postgres.v1", executor_id="python.local"),
 ]
 
 PORTFOLIO_WORKFLOW = WorkflowDefinition(

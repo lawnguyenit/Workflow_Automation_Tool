@@ -8,6 +8,7 @@ This directory separates the requested direction, accepted decisions, actual imp
 - [Impact map](impact-map.md)
 - [Verification and gaps](verification.md)
 - [Lead-management independent audit](lead-management-audit.md)
+- [Release 0.10.0 independent audit](AUDIT-0.10.0.yaml)
 - [Initial plan](../plan.md)
 
 State vocabulary: `requested`, `proposed`, `approved`, `implemented`, `verified`, `accepted`, `blocked`, `rejected`, `unknown`.

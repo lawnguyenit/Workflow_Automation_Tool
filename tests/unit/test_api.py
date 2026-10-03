@@ -12,7 +12,7 @@ def test_catalog_and_health_are_available():
         "storage.record", "notify.send", "gmail.send", "lead.intake", "lead.store",
         "lead.qualify", "source.google_form_response", "source.google_forms_api_response",
         "crm.ghl_upsert_contact",
-        "crm.ghl_upsert_opportunity", "crm.ghl_contact_tags",
+        "crm.ghl_upsert_opportunity", "crm.ghl_contact_tags", "lead.followup_gate",
     }
 
 

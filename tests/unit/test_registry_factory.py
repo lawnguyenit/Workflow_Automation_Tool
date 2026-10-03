@@ -91,3 +91,17 @@ def test_forms_api_source_module_is_bound_without_account_credentials():
     assert registry.workflow_instances[
         "portfolio.lead_management_google_forms_api"
     ].workflow_definition_id == "lead_management_google_forms_api"
+
+
+def test_followup_gate_is_a_reusable_fail_closed_module_instance():
+    from workflow_automation.modules.processing.lead_followup_gate import LeadFollowupGate
+
+    registry = build_registry()
+    instance = registry.instances["portfolio.lead_followup_gate"]
+    assert instance.module == "lead.followup_gate"
+    assert isinstance(registry.instance_modules[instance.instance_id], LeadFollowupGate)
+    preview = registry.instance_modules[instance.instance_id].execute(
+        {"operation": "check", "subject_scope": "synthetic", "subject_id": "synthetic-contact"},
+        ExecutionContext(workflow_id="followup_test", mode=RunMode.DRY_RUN),
+    )
+    assert preview.business_result["can_send"] is False

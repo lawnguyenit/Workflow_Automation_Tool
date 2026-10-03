@@ -14,6 +14,8 @@ Google Forms API polling (read-only schema + response scopes; inactive template)
   → lead.store: PostgreSQL write protected by a unique source event key
 ```
 
+The registered `portfolio.lead_followup_gate` is a reusable component but is not yet connected to this graph. Reply, booking, opt-out, approved-message, enrollment, and schedule sources are not configured. See [follow-up gate](lead-followup-gate.md) for its contract and the current limits.
+
 The current portfolio path does not call a live LLM, create a CRM contact/opportunity, or send a message. No qualification rubric, GHL test Location, or OpenAI API key is available. It therefore preserves the request and marks it for human review rather than guessing a sales class or summary. A synthetic rubric/fixture can exercise the classification composition without a paid provider call.
 
 The existing manual/local instance still accepts a canonical lead object. The earlier `portfolio.lead_management_google_form` instance accepts a row from the linked response Sheet. The selected portfolio composition is `portfolio.lead_management_google_forms_api`: it maps one Forms API response using the matching form schema before reusing the same downstream pipeline. Its mapper and inactive polling export are synthetic-tested; owner OAuth, exact live schema, n8n import, and API access remain unverified. See [Google Forms API response adapter](google-forms-api-response.md).

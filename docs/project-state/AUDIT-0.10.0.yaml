@@ -1,0 +1,72 @@
+audit_id: AUDIT-0.10.0
+date: 2026-10-03
+status: FAILED_AUDIT
+scope:
+  target: "The supplied Upwork GHL lead-management brief, approved Google Forms API source decision (DEC-010), and release 0.10.0 follow-up suppression module (DEC-012)."
+  auditor: "Independent read-only deliverable audit; focused follow-up reviewed the HMAC revision."
+  evidence_policy: "Auditor inspected source, docs, tests, and reported runtime results; did not rerun the integration harness or contact external services."
+summary: >-
+  The standalone follow-up gate is implemented and locally verified per the implementation record, but the Upwork brief remains incomplete. The selected Forms API source is only statically designed and has no OAuth/live response/n8n execution evidence. The lead composition ends at PostgreSQL and has no connected GHL or follow-up sender/event sources. The HMAC revision materially reduces database-only identity guessing when its high-entropy key is protected, but key rotation/recovery tooling and production monitoring are absent.
+module_assessment:
+  followup_gate: "PASS within standalone module boundary; not proof of end-to-end suppression."
+  forms_api_source: "Static design reviewed; live path NOT_TESTED."
+  full_job: "FAIL / incomplete."
+findings:
+  - id: AUD-0101
+    severity: high
+    disposition: open
+    title: "End-to-end brief outcome is not implemented."
+    evidence:
+      - "docs/modules/lead-management-reference.md: current graph ends at lead.store."
+      - "src/workflow_automation/definitions.py: selected Forms API workflow ends at PostgreSQL."
+      - "No live GHL, model, or follow-up message operation is configured."
+    impact: "An enquiry cannot be shown traversing qualification, CRM update, and approved follow-up as the client success criterion requires."
+    next_gate: "Obtain account-owned CRM/provider access and business mappings, then compose and verify the agreed path."
+  - id: AUD-0102
+    severity: high
+    disposition: open
+    title: "Follow-up suppression is not wired into senders or event sources."
+    evidence:
+      - "docs/modules/lead-followup-gate.md: module is standalone and does not send, schedule, or discover lifecycle events."
+      - "No producer-to-consumer edge proves every follow-up send checks state immediately beforehand."
+    impact: "Reply, booking, opt-out, and manual pause behavior has not been demonstrated in an actual composed workflow."
+    next_gate: "Approve enrollment/message policy and connect authoritative reply, booking, opt-out, and pause sources to the gate and a sender."
+  - id: AUD-0103
+    severity: medium
+    disposition: open
+    title: "Google Forms API read-only source has no live OAuth or n8n runtime evidence."
+    evidence:
+      - "docs/modules/google-forms-api-response.md: approved scopes and inactive polling template; no authorization or API call."
+      - "Drive/Sheets metadata probe is not evidence of Google Forms API access."
+    impact: "Exact question mapping and source-to-database execution remain unverified against the private Form."
+    next_gate: "Configure read-only OAuth in n8n, verify live schema, submit synthetic test data, and run the inactive workflow under owner observation."
+  - id: AUD-0104
+    severity: high
+    disposition: documented_risk_open_tooling
+    title: "HMAC key loss/rotation can make existing suppression states unreachable."
+    evidence:
+      - "src/workflow_automation/modules/processing/lead_followup_gate.py: HMAC output is the persisted subject/event identity."
+      - "docs/modules/lead-followup-gate.md: no rotation/recovery tooling; key custody/reconciliation is required."
+    impact: "A new key can make prior opt-out/reply records invisible; enrolling under that key could create a new ACTIVE record for the same external person."
+    next_gate: "Before any real identities, define protected key backup/custody and a controlled identity/state migration or disable enrollment/sending until manual reconciliation."
+  - id: AUD-0105
+    severity: medium
+    disposition: open
+    title: "Lead-level monitoring and recovery are not composed."
+    evidence:
+      - "docs/modules/lead-followup-gate.md: no alert delivery, DLQ, or automated event-source retry."
+      - "No end-to-end alert/replay/operator resolution path was exercised."
+    impact: "Fail-closed behavior prevents unsafe sends but can leave failures without actionable operator notification or recovery."
+    next_gate: "Add a client-approved alert and recovery path and test alert delivery, replay/reconciliation, and duplicate side effects."
+verification_record:
+  implementation_reported:
+    - "uv run pytest -q: 170 passed, 1 existing Starlette deprecation warning."
+    - "Docker Compose PostgreSQL integration covers event dedupe/conflict, terminal states, pause/resume, concurrent event races, and lock timeout; test rows were cleaned (0 event/control rows)."
+    - "Docker API 0.10.0 health/catalog and DRY_RUN gate response were checked locally."
+  auditor_actions:
+    - "Inspected source, docs, and test definitions; did not rerun tests or external account calls."
+    - "Reviewed HMAC follow-up revision and its tests/docs; did not edit files."
+  unverified:
+    - "Google Forms OAuth/API and n8n import/activation/runtime."
+    - "GoHighLevel, live model, outbound follow-up, reply/booking/opt-out events, and client end-to-end acceptance."
+    - "Production key custody/rotation, alerts, recovery, capacity, and external provider semantics."

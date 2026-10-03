@@ -30,6 +30,7 @@ from workflow_automation.modules.output.notify import NotifySend
 from workflow_automation.modules.output.gmail_send import GmailSend
 from workflow_automation.modules.processing.lead_intake import LeadIntake
 from workflow_automation.modules.processing.lead_qualify import LeadQualify
+from workflow_automation.modules.processing.lead_followup_gate import LeadFollowupGate
 from workflow_automation.modules.processing.document_extract import DocumentExtract
 from workflow_automation.modules.processing.llm_structured_extract import LLMStructuredExtract
 from workflow_automation.modules.processing.validate import Validate
@@ -152,6 +153,8 @@ def build_registry(additional_module_instances=None) -> FrameworkRegistry:
             )
         elif item.module == "lead.store":
             module = PostgresLeadStore()
+        elif item.module == "lead.followup_gate":
+            module = LeadFollowupGate()
         elif item.module == "crm.ghl_upsert_contact":
             module = GHLUpsertContact(
                 location_id=config.get("location_id", ""),
