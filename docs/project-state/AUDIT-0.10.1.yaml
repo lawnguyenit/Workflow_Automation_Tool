@@ -1,0 +1,125 @@
+audit_id: AUDIT-0.10.1
+date: 2026-10-03
+status: FAILED_AUDIT
+scope:
+  target: "Supplied Upwork lead-management brief using the selected Google Forms API read-only source, reusable lead modules, and current local n8n/PostgreSQL instance."
+  auditor: "Independent read-only deliverable audit by a separate deliverable-auditor agent."
+  evidence_policy: >-
+    Auditor inspected the current repository state, module/composition contracts,
+    project evidence, and prior audit findings. The auditor did not edit files,
+    rerun tests or integrations, call external providers, or claim user acceptance.
+    Runtime and test evidence below is attributed to the implementation record.
+summary: >-
+  The local reference now has the selected Forms API poller imported into n8n
+  inactive, a separate synthetic DRY_RUN preview reported successful, and a
+  synthetic mapper-to-PostgreSQL integration reported successful with cleanup.
+  These are useful local composition steps, but they do not demonstrate a live
+  source, qualification provider, GoHighLevel update, or follow-up. The full
+  Upwork success criterion remains unmet. The follow-up suppression gate and
+  several CRM/provider adapters are standalone modules rather than one accepted,
+  end-to-end business workflow.
+module_assessment:
+  forms_api_source: "Imported inactive template; no Form ID, OAuth credential, API call, or poller execution."
+  lead_intake_and_storage: "Locally composed; synthetic unit/integration evidence is implementation-reported, not rerun by this auditor."
+  qualification: "Review path exists; live LLM extraction/classification is unverified and no approved rubric or API credential is configured."
+  ghl_adapters: "Reusable adapters exist separately; no account/Location, mappings, or composed lead workflow."
+  followup_gate: "Standalone suppression component; not connected to lifecycle event producers, scheduler, or sender."
+  full_job: "FAIL / incomplete."
+criterion_matrix:
+  - criterion: "Capture from one live website form or webhook"
+    result: "NOT_TESTED / incomplete"
+    evidence: "Forms API poller is imported but inactive, uncredentialed, and has a placeholder Form ID. The private Form is unpublished. No live response was read."
+  - criterion: "Validate and standardize contact details"
+    result: "PASS, bounded"
+    evidence: "Source and unit-test inspection shows trimming, email normalization, bounded field validation, and missing/invalid-field review behavior. Phone country code/E.164 semantics are not guessed."
+  - criterion: "Prevent duplicate submissions and CRM records"
+    result: "PARTIAL"
+    evidence: "The local store uses a unique source-event key and reports same-key retry/conflict behavior in synthetic integration evidence. Person-level, GHL contact/opportunity, and outbound-message dedupe are not demonstrated end-to-end."
+  - criterion: "AI extraction, summary, and qualification"
+    result: "NOT_TESTED / incomplete"
+    evidence: "A fail-closed review path and configurable qualification module exist. No owner-approved rubric or OpenAI API credential; no live model call or provider result verified."
+  - criterion: "Create/update GHL contacts, custom fields, tags, and opportunities"
+    result: "NOT_TESTED / incomplete"
+    evidence: "Reusable GHL adapters exist, but there is no GHL account/Location, token/scopes, approved field/tag/pipeline mapping, or composed source-to-CRM path."
+  - criterion: "Acknowledgement and follow-up with stop conditions"
+    result: "NOT_TESTED / incomplete"
+    evidence: "A standalone suppression gate exists. No approved message, booking link, enrollment/timing policy, sender composition, or authoritative reply/book/opt-out/pause event sources are configured."
+  - criterion: "Execution logs, controlled retry, alerting, and recovery"
+    result: "PARTIAL / incomplete"
+    evidence: "Some module-level idempotency, sanitized status, retry classification, and unknown-outcome holds exist. No composed lead alert, dead-letter/replay operator path, or end-to-end recovery exercise was verified."
+  - criterion: "Exported workflows, setup guide, and handover"
+    result: "PARTIAL"
+    evidence: "Reusable exports and setup/module documentation exist. The Forms poller is imported inactive, but no complete GHL/follow-up workflow export or client handover recording exists."
+  - criterion: "Successful enquiry through qualification, CRM, and correct follow-up"
+    result: "FAIL / not delivered"
+    evidence: "Only the local synthetic lead path to PostgreSQL is reported. No live source-to-AI-to-GHL-to-follow-up run exists."
+  - criterion: "User acceptance"
+    result: "PENDING"
+    evidence: "The user has not accepted a completed client-scope workflow."
+findings:
+  - id: AUD-0101
+    severity: high
+    disposition: open
+    title: "The end-to-end business outcome is not implemented."
+    evidence:
+      - "Current lead composition maps Forms data into intake, qualification/review, and PostgreSQL storage."
+      - "The independent audit found no composed edge from the lead graph to GHL or a follow-up sender."
+      - "The successful local preview is DRY_RUN and the reported PostgreSQL harness uses synthetic data."
+    impact: "The stated client outcome—one enquiry progressing through qualification, CRM update, and follow-up—cannot yet be demonstrated."
+    next_gate: "Obtain the required account access and business mappings, then compose and verify the agreed flow."
+  - id: AUD-0102
+    severity: high
+    disposition: open
+    title: "Follow-up suppression is not wired to a sender and authoritative event sources."
+    evidence:
+      - "The follow-up gate is independently callable and persists suppression state, but does not send or discover lifecycle events."
+      - "No connected reply, booking, opt-out, or manual-pause producer was identified in the lead composition."
+    impact: "Stop conditions have not been demonstrated on an actual scheduled or triggered message path."
+    next_gate: "Approve message/enrollment rules and connect the selected sender and authoritative lifecycle event sources."
+  - id: AUD-0103
+    severity: medium
+    disposition: partially_addressed
+    title: "Google Forms API source lacks owner OAuth and live poller evidence."
+    evidence:
+      - "The nine-node polling workflow is now imported into local n8n, inactive, with no credential and a placeholder Form ID."
+      - "The separate synthetic local DRY_RUN preview was executed; it did not call Google Forms."
+      - "The synthetic mapper-to-PostgreSQL integration is reported as successful and cleaned up."
+    impact: "The private Form's exact schema and source-to-database polling behavior remain unverified."
+    next_gate: "Supply the private Form ID/edit URL and configure owner-controlled read-only OAuth in n8n; then inspect schema and run an owner-observed synthetic event."
+  - id: AUD-0104
+    severity: high
+    disposition: documented_risk_open_tooling
+    title: "Follow-up identity HMAC key custody and rotation lack recovery tooling."
+    evidence:
+      - "Persisted subject identity depends on a stable HMAC key."
+      - "Current module documentation does not provide a safe state migration/rotation tool."
+    impact: "Changing or losing the key may make prior suppression state unreachable and can permit a duplicate enrollment unless reconciled."
+    next_gate: "Before real prospect enrollment, define protected key custody/backup and a controlled migration or manual reconciliation procedure."
+  - id: AUD-0105
+    severity: medium
+    disposition: open
+    title: "Lead-level alerting and recovery are not composed."
+    evidence:
+      - "Standalone components expose error/unknown states, but no end-to-end alert delivery, dead-letter queue, or operator replay path was verified."
+    impact: "A fail-closed workflow can stop unsafe actions while still leaving an operator unaware of or unable to recover a failed lead."
+    next_gate: "Choose an alert destination and recovery owner, then exercise alert, reconciliation, and safe replay behavior."
+open_client_inputs:
+  - "Private Google Form ID/edit URL and owner-controlled Google OAuth consent for read-only Forms API access."
+  - "GoHighLevel account/Location and authorized API connection, if GHL remains the target CRM."
+  - "Approved contact matching, custom fields, tags, pipeline, and opportunity-stage rules."
+  - "Qualification rubric, accepted labels, and provider/account budget for any live model use."
+  - "Approved message copy, sender, booking link, timing, enrollment/consent policy, and authoritative stop-event sources."
+  - "Alert destination and named recovery owner."
+verification_record:
+  independent_auditor_actions:
+    - "Inspected the current repository, selected workflow composition, module contracts, project-state evidence, and prior audit."
+    - "Did not edit source, rerun tests/integration harnesses, contact external services, or claim user acceptance."
+  implementation_reported_evidence:
+    - "n8n 2.41.6 imported the nine-node Forms API poller as inactive with no credentials and a placeholder Form ID; execution saving is disabled."
+    - "A separate synthetic DRY_RUN preview completed in the n8n UI; no Google, database, CRM, model, or email side effect occurred in that preview."
+    - "Synthetic mapper-to-PostgreSQL integration returned STORED, DUPLICATE on retry, PAYLOAD_CONFLICT_REVIEW on changed payload, and cleaned its test rows."
+    - "Targeted lead/forms tests previously reported 16 passing tests; this audit did not rerun them."
+  not_verified:
+    - "Google OAuth consent, Forms API response read, and execution of the imported poller."
+    - "Live LLM, GHL contact/opportunity updates, outbound email/follow-up, lifecycle stop events, and client end-to-end acceptance."
+    - "Production monitoring/recovery, general capacity, backup/restore, and key rotation/recovery."

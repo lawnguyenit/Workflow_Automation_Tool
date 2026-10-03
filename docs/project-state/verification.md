@@ -1,5 +1,9 @@
 ## Current release 0.10.0 — Durable lead follow-up suppression gate
 
+## Current state correction — 2026-10-03
+
+Older entries below include snapshots that said the Forms workflow had not been imported. Those statements remain as dated history and are superseded by the import evidence below: the nine-node Forms API poller is now present in local n8n, inactive, uncredentialed, and still configured with a placeholder Form ID. Only the separate synthetic `DRY_RUN` preview was executed in n8n; the poller has not called Google Forms. The synthetic mapper-to-PostgreSQL integration was run and cleaned up. The latest independent brief audit is [AUDIT-0.10.1.yaml](AUDIT-0.10.1.yaml), which continues to fail the full Upwork scope.
+
 ### n8n Forms poller import — 2026-10-03
 
 - Imported `workflows/n8n/lead-management-google-forms-api.local.json` into the existing local n8n 2.41.6 personal project using the supported `n8n import:workflow` CLI. The source export was not modified; a temporary local workflow ID was added only to the import copy because n8n's CLI requires an ID.
