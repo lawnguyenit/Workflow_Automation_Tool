@@ -1,0 +1,242 @@
+job_id: portfolio-lead-management-upwork-brief
+audit_id: pre-job-module-readiness-2026-10-03
+auditor: independent deliverable auditor (read-only)
+last_updated: 2026-10-03
+independent_of_implementation: true
+scope: >-
+  Reassess the reusable lead-management automation modules using the user's
+  three-layer pre-job rubric. Client account/live acceptance is not a portfolio
+  pass condition. Local and provider-contract-testable behavior is in scope.
+criteria:
+  - id: LOCAL-01
+    layer: LOCAL-AUDITABLE
+    result: pass
+    evidence:
+      - "uv run pytest -q, run during this audit: 198 passed; one existing Starlette/httpx deprecation warning."
+      - "Synthetic Compose/PostgreSQL runs during this audit: lead qualification ledger, GHL contact ledger, GHL opportunity ledger, Gmail outbox, and workflow incident log all completed and removed their synthetic rows."
+      - "Unit/integration coverage includes deterministic validation, stable event keys, changed-payload conflicts, concurrent claims, lease/checkpoint behavior, and fail-closed uncertainty."
+    limitation: "Bounded fixtures and local Docker/PostgreSQL only; this is not broad capacity or arbitrary-tenant evidence."
+    owner_next_action: "Keep regression tests with each module change; add the outstanding independent operational checks in findings."
+  - id: LOCAL-02
+    layer: LOCAL-AUDITABLE
+    result: pass
+    evidence:
+      - "Qualification cache fingerprints input, criteria, model and prompt version; integration verifies cache replay, changed-input hold, unknown hold, concurrent call and daily call-count cap."
+      - "GHL contact/opportunity event ledgers cache confirmed results and hold uncertain writes; integration verifies overlap, replay, payload conflict and unknown hold."
+      - "Gmail outbox integration verifies concurrent same-key claim, duplicate suppression, unknown hold and confirmed-send payload redaction."
+      - "Follow-up suppression tests verify stop/pause/resume, event identity conflict, concurrency and fail-closed database timeout."
+    limitation: "These guarantees apply to callers using the shared local database/guards. They do not coordinate independent CRM writers or messages already accepted by a provider."
+    owner_next_action: "Retain the shared-guard precondition in module contracts and confirm it during each client deployment."
+  - id: LOCAL-03
+    layer: LOCAL-AUDITABLE
+    result: risk
+    evidence:
+      - "docs/modules/lead-qualification.md documents only LEAD_LLM_MAX_CALLS_PER_DAY and explicitly says it is not a dollar cap."
+      - "src/workflow_automation/modules/processing/lead_qualify.py sends bounded input/output token requests but has no local price table, cost estimate, per-call USD ceiling or budget ledger."
+    limitation: "The portfolio makes no live model calls. Provider-account budget controls remain client-owned, but reusable local spend estimation and rejection are independently testable now."
+    owner_next_action: "Before enabling REAL qualification, implement a versioned/configurable estimate and budget guard, test under/over-budget and price/model changes, and still require a client-side USD cap."
+  - id: LOCAL-04
+    layer: LOCAL-AUDITABLE
+    result: risk
+    evidence:
+      - "Gmail unknown-send reconciliation instructions in docs/modules/gmail-send.md require operator inspection of Sent and manual state handling."
+      - "GHL operator guidance in docs/modules/ghl-opportunity-upsert.md and related adapter docs uses direct SQL to resolve exact UNKNOWN/IN_PROGRESS records."
+      - "Current PostgreSQL integrations verify holds and no unsafe replay; they do not exercise a reusable operator reconciliation command/API across confirmed-write, confirmed-no-write and still-ambiguous outcomes."
+      - "docs/modules/workflow-incident-log.md says resolution is one-way acknowledgement and does not retry or prove provider state."
+    limitation: "The conservative hold behavior prevents duplicate side effects, but recovery remains expert/manual and differs by adapter."
+    owner_next_action: "Define a shared reconciliation contract and independently test its three outcomes, affected-row checks, event/effect-ledger atomicity and safe replay. Add operator API/CLI only after the contract is settled."
+  - id: LOCAL-05
+    layer: LOCAL-AUDITABLE
+    result: risk
+    evidence:
+      - "The Compose PostgreSQL service has a persistent volume and migration bootstrap, but no repository backup/restore procedure or restore verification artifact was found."
+      - "Current verification.md explicitly lists backup/restore as unverified."
+    limitation: "This does not invalidate the tested transaction/migration logic; it leaves recovery from local/client database loss unproven."
+    owner_next_action: "Add a local backup/restore runbook and synthetic restore check that proves schema plus idempotency/reconciliation state survive recovery."
+  - id: LOCAL-06
+    layer: LOCAL-AUDITABLE
+    result: risk
+    evidence:
+      - "No load/capacity test files or benchmark workflow were found in the repository."
+      - "Existing concurrency tests target narrow same-key/guard races, not sustained throughput, pool saturation, lock contention or backlog behavior."
+    limitation: "No real client volume has been specified, so no production capacity claim is possible; a bounded local baseline is still testable."
+    owner_next_action: "Define a repeatable synthetic load profile and record throughput, latency, database pool/lock saturation and recovery after overload."
+  - id: LOCAL-07
+    layer: LOCAL-AUDITABLE
+    result: risk
+    evidence:
+      - "No repository CI workflow or automated migration/config validation pipeline was found."
+      - "Local suite passes, but future changes are not shown to run the suite, static checks and migration/init parity checks automatically."
+    limitation: "This is a maintainability/release-control gap, not a failure of the current 198 tests."
+    owner_next_action: "Add CI for unit suite, compile/lint, lockfile, secret/export checks, migration reapply and fresh-init parity."
+  - id: LOCAL-08
+    layer: LOCAL-AUDITABLE
+    result: risk
+    evidence:
+      - "src/workflow_automation/infrastructure/postgres_workflow_incidents.py and docs/modules/workflow-incident-log.md specify best-effort incident persistence; an API/database outage can leave no durable incident."
+      - "The incident integration verifies sanitized incident rows and API operations when PostgreSQL is available, not visibility when persistence itself fails."
+    limitation: "The original execution result remains authoritative, but this leaves an observability blind spot during database failure."
+    owner_next_action: "Test the persistence-failure boundary and define an independent fallback signal or explicitly document and monitor the accepted loss window."
+  - id: LOCAL-09
+    layer: LOCAL-AUDITABLE
+    result: pass
+    evidence:
+      - "Local Docker Compose services are running; PostgreSQL reports healthy."
+      - "Current release verification records successful idempotent migration application and fresh-database init parity for the 0.14 GHL ledgers."
+      - "Compose binds API/n8n ports to loopback and the API image runs as a non-root user."
+    limitation: "The n8n image defaults to a floating stable tag; production image pinning, secret custody, backups and host/network hardening are deployment-specific."
+    owner_next_action: "Pin image versions/digests and run configuration validation as part of a client deployment; do not treat the local Compose stack as production-hardened."
+  - id: CONTRACT-01
+    layer: PROVIDER-CONTRACT-AUDITABLE
+    result: pass
+    evidence:
+      - "GHL contact/opportunity mock tests cover request construction, auth failures, 429, 5xx/timeout unknown outcomes, malformed responses, pagination/ambiguity, idempotent replay and concurrency."
+      - "Gmail mock tests cover MIME boundaries, 401/403, 429 Retry-After delay-seconds and HTTP-date, malformed success, timeout/unknown hold and output redaction."
+      - "OpenAI mock tests cover strict structured request shape, malformed/unlisted output, timeout hold, schema validation and request deduplication."
+      - "Forms response mapping has synthetic schema/response fixtures and the imported n8n workflow remains inactive and credential-free."
+    limitation: "Mocked contracts do not establish provider authenticity, tenant-specific behavior, live OAuth, quota behavior or current account permissions."
+    owner_next_action: "Reuse the contract fixtures and add cases named in CONTRACT-02 before calling these adapters client-ready."
+  - id: CONTRACT-02
+    layer: PROVIDER-CONTRACT-AUDITABLE
+    result: risk
+    evidence:
+      - "GHL contact parses only integer Retry-After in src/workflow_automation/modules/crm/ghl_upsert_contact.py; opportunity maps 429 to retryable without surfacing the header."
+      - "OpenAI maps 429 and 5xx together to LLM_PROVIDER_UNAVAILABLE/UNKNOWN and does not expose Retry-After; 401 and 403 are not distinguished in the local error contract."
+      - "Gmail is the only inspected adapter with tests for both Retry-After formats."
+    limitation: "No live call is needed to normalize these headers/statuses. Conservative UNKNOWN is safe from duplicate calls but can strand a definitively rejected rate-limited request for manual reconciliation."
+    owner_next_action: "Normalize Retry-After across adapters; test integer/date/malformed/absent values, distinguish definite rejection from unknown write outcome, and assert that no adapter sleeps or retries internally."
+  - id: CONTRACT-03
+    layer: PROVIDER-CONTRACT-AUDITABLE
+    result: risk
+    evidence:
+      - "docs/modules/gmail-send.md states the module accepts only a runtime access token and does not refresh OAuth tokens."
+      - "Mock tests cover authorization rejection, not an expired-token refresh exchange or safe one-time replay after refresh."
+    limitation: "Client credentials and consent are client-bound, while refresh-token lifecycle behavior and its tests can be built without a live mailbox."
+    owner_next_action: "Choose whether token refresh belongs in a reusable credential provider or the native n8n credential; contract-test expiry, refresh rejection, concurrent refresh and secret redaction before enabling the sender."
+  - id: CLIENT-01
+    layer: CLIENT-BOUND
+    result: not_tested
+    evidence:
+      - "JOB_SPEC.yaml, DECISIONS.yaml and COSTS.md record unresolved account/tenant inputs; no live Forms, LLM, GHL or Gmail module operation is claimed."
+    limitation: "Requires a job/customer to supply authorized Forms account/Form ID and schema, GHL Location/token/mappings, OpenAI API organization/rubric/budget, mailbox credentials and approved message policy."
+    owner_next_action: "At job intake, capture the exact account permission/scope, mapping and policy; run the minimum client live smoke test only after authorization and budget are explicit."
+  - id: CLIENT-02
+    layer: CLIENT-BOUND
+    result: not_tested
+    evidence:
+      - "No production tenant, network, real-volume or end-user acceptance environment is connected to this portfolio instance."
+    limitation: "Firewall, OAuth consent, provider plans, search consistency, account-specific duplicate behavior and client acceptance cannot be proved from this repository."
+    owner_next_action: "Defer to the job's test tenant/UAT. Never report this as a failed local module audit."
+modules:
+  - id: source.google_forms_api_response
+    result: pass
+    evidence: ["Synthetic mapper/schema fixtures and integration evidence; poller inactive and no live Forms request."]
+  - id: lead.intake / lead.store
+    result: pass
+    evidence: ["Unit suite and synthetic Compose/PostgreSQL stored, duplicate and changed-payload conflict checks."]
+  - id: lead.qualify
+    result: risk
+    evidence: ["Structured-output validation, ledger replay/concurrency/unknown hold and call-count cap verified; no local USD estimator/budget gate; live model intentionally deferred."]
+  - id: crm.ghl_upsert_contact / crm.ghl_contact_tags / crm.ghl_upsert_opportunity
+    result: risk
+    evidence: ["Mock/PostgreSQL replay, conflict, overlap and unknown-hold behavior verified; cross-adapter Retry-After and operator reconciliation contract need hardening; no live tenant required for those changes."]
+  - id: lead.followup_gate
+    result: pass
+    evidence: ["Synthetic local PostgreSQL event/state/concurrency tests; it remains a standalone gate, not a connected follow-up flow."]
+  - id: gmail.send
+    result: risk
+    evidence: ["Mock/PostgreSQL MIME, outbox, idempotency, rate-limit and unknown-outcome behavior verified; token refresh and shared reconciliation contract remain unimplemented."]
+  - id: workflow.incident_log
+    result: risk
+    evidence: ["Synthetic PostgreSQL/API redaction/list/resolve checks pass; persistence is best effort and no fallback delivery/DLQ worker exists."]
+  - id: workflow.success_gating
+    result: pass
+    evidence: ["198-test full suite includes generic dependency success-gating; lead-specific downstream graph composition is deferred until job mapping/policy exists."]
+composition_edges:
+  - producer: "Forms API response mapper"
+    consumer: "lead intake and local PostgreSQL store"
+    result: pass
+    limitation: "Synthetic FormResponse only; no OAuth/API request."
+  - producer: "local lead store"
+    consumer: "qualification/GHL adapters"
+    result: risk
+    limitation: "The modules and their individual contracts are tested, but the current portfolio graph does not exercise the full edge chain with a single synthetic run. A contract-only composition harness is locally buildable; client field/rubric choices remain separate."
+  - producer: "follow-up gate"
+    consumer: "Gmail sender"
+    result: risk
+    limitation: "Both boundaries have standalone tests, but there is no composed synthetic send path proving gate-before-send under replay/stop races. The reusable composition can be tested with a mocked sender without a live mailbox."
+end_to_end:
+  result: not_tested
+  evidence:
+    - "This audit did not use full production pipeline completion as the pass criterion."
+    - "The repo contains independently tested modules and a bounded source-to-local-store composition; current n8n graph does not include CRM and follow-up."
+  limits:
+    - "Client-specific mappings, rubric, message policy and provider authenticity are deferred."
+    - "Two generic composition paths (lead-to-CRM boundary and gate-to-sender) can still be exercised locally with mocks and are listed as risks, not client blockers."
+failure_report_applicability:
+  - "The incident API logs sanitized failures from workflow/API executions that reach the application and PostgreSQL."
+  - "n8n-only failures and PostgreSQL-outage failures can remain outside that record; no external alert/DLQ delivery is composed."
+  - "Provider unknown outcomes are held rather than blindly retried, but a generic tested operator reconciliation workflow is absent."
+output_integrity:
+  - "Previously inspected Forms export is inactive, placeholder-based and credential-free; current workflow source was not modified by this read-only audit."
+  - "No full CRM/follow-up export or client handover is required for pre-job module readiness; those artifacts are job-specific."
+blocking_findings:
+  - id: AUD-PREJOB-01
+    severity: high
+    title: "Qualification has a call-count cap but no local USD spend estimate or budget rejection."
+    evidence: "src/workflow_automation/modules/processing/lead_qualify.py and docs/modules/lead-qualification.md; DEC-JOB-010 requires independent readiness and the rubric explicitly lists cost-estimation logic."
+    impact: "An attempted-call cap does not constrain cost per request across models or token sizes. Provider billing controls remain necessary but do not replace a reusable preflight guard."
+    can_fix_now: true
+    next_action: "Implement and test versioned price/config inputs, conservative per-call estimate, cumulative cap, missing/stale price fail-closed behavior and model-change invalidation; retain client-side budget as a second control."
+  - id: AUD-PREJOB-02
+    severity: high
+    title: "No common, executable reconciliation contract covers known-success, known-no-effect and still-ambiguous outcomes."
+    evidence: "GHL module runbooks rely on exact SQL edits; Gmail unknowns require separate mailbox and outbox inspection; incident resolution only acknowledges. The integration harnesses prove holds, not the complete operator reconciliation transition."
+    impact: "Operators can safely stop duplicate effects but cannot use one tested, bounded recovery path; a mistaken manual state edit may duplicate or permanently suppress an effect."
+    can_fix_now: true
+    next_action: "Specify shared reconcile outcomes and atomic guards; add mocked-provider/local-PostgreSQL tests for all outcomes and exact affected-row invariants before adding an operator surface."
+  - id: AUD-PREJOB-03
+    severity: medium
+    title: "Provider adapters do not expose a consistent Retry-After contract."
+    evidence: "GHL contact accepts integer seconds only; GHL opportunity and OpenAI do not propagate the header; OpenAI folds 429 with 5xx. Gmail covers both header formats."
+    impact: "Callers cannot apply a uniform bounded scheduling policy. A definite rate-limit rejection may be unnecessarily held for manual reconciliation, while unscheduled retries may hammer a provider."
+    can_fix_now: true
+    next_action: "Create shared parser/status mapping tests for seconds, HTTP-date, invalid and missing headers; distinguish rejected 429 from write-unknown 5xx and keep retry scheduling outside modules."
+  - id: AUD-PREJOB-04
+    severity: medium
+    title: "Database backup and restore are not demonstrated."
+    evidence: "Compose has a persistent PostgreSQL volume; no backup/restore runbook or verified synthetic restore is present."
+    impact: "Loss of event/outbox/checkpoint/stop ledgers can reopen duplicate side effects or forget suppression state."
+    can_fix_now: true
+    next_action: "Add local backup/restore procedure and test restoring schema plus synthetic replay/stop state into an isolated temporary database."
+  - id: AUD-PREJOB-05
+    severity: medium
+    title: "No bounded load/capacity baseline exists."
+    evidence: "Integration scripts test selected concurrency races only; no sustained synthetic throughput/pool/lock saturation profile was found."
+    impact: "Backlog behavior, database contention, timeouts and recovery after overload remain unknown even before client-specific volume is considered."
+    can_fix_now: true
+    next_action: "Add a reproducible local load profile with explicit non-production limits and record saturation/recovery behavior."
+  - id: AUD-PREJOB-06
+    severity: medium
+    title: "Critical module graph edges are tested separately but not as one synthetic composition."
+    evidence: "PIPELINE.yaml marks local-store-to-GHL and follow-up-gate-to-sender edges blocked; runner success-gating is generic; active lead graph stops at local storage."
+    impact: "Type/status/idempotency propagation between modules can still break during composition, despite each module passing its own tests."
+    can_fix_now: true
+    next_action: "Add contract-only integration harnesses for qualification/store/CRM and gate/outbox/sender using fixtures plus MockTransport; leave mappings and policy injectable."
+  - id: AUD-PREJOB-07
+    severity: low
+    title: "No automated repository CI gate was found."
+    evidence: "No .github workflow or equivalent checked-in CI pipeline is present."
+    impact: "The current suite passes locally, but future module changes can be pushed without repeatable tests, migration parity or secret/export checks."
+    can_fix_now: true
+    next_action: "Add CI that runs the unit suite and static/config/migration/export safety checks on every change."
+non_blocking_risks:
+  - "Incident persistence is best effort and can be absent during a PostgreSQL outage; either add an independent fallback or explicitly accept and monitor this loss boundary."
+  - "Gmail access-token refresh is outside the standalone sender; contract-test a credential provider or use a native n8n OAuth credential before a live job."
+  - "The current Compose n8n image uses a floating stable tag; pin versions/digests per deployment."
+  - "Independent external writers, provider eventual consistency, tenant duplicate rules, live network/volume and user acceptance are intentionally CLIENT_BOUND."
+user_review_items:
+  - "Confirm the priority order for implementing local hardening: USD guard and reconciliation first, then Retry-After, backup/restore, composition, load baseline and CI."
+  - "No client account, provider charge or live operation is requested by this audit."
+recommendation: FAILED_AUDIT
+recommendation_scope: "Pre-job reusable-module readiness only; not the deferred client end-to-end deliverable."

@@ -19,5 +19,6 @@ This folder tracks the supplied Upwork brief as a bounded portfolio exercise. It
 - [TASKS.yaml](TASKS.yaml): bounded owner and workflow-lead work with gates and verification criteria.
 - [COSTS.md](COSTS.md): provider costs, quotas, customer-owned accounts, and the paid-test policy.
 - [STATUS-MAP.md](STATUS-MAP.md): visual pipeline state, module test evidence, client gates, cost notes, and the real-job debugging path.
+- [Pre-job layered module-readiness audit](../AUDIT-pre-job-readiness-2026-10-03.yaml): separates local/mock gaps from client-bound live checks; supersedes the old full-brief verdict as the readiness assessment for work before a client job.
 
 Do not mark a blocked edge complete based on a module unit test. Re-audit the full composed path after owner inputs and runtime evidence exist.

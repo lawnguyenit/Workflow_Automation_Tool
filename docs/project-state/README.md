@@ -16,6 +16,7 @@ This directory separates the requested direction, accepted decisions, actual imp
 - [Release 0.14.0 verification](verification.md#current-release-0140--cost-aware-module-readiness-and-ghl-event-ledgers)
 - [Release 0.14.0 release notes](../releases/0.14.0.md)
 - [Release 0.13.0 full-brief audit snapshot](AUDIT-0.13.0.yaml)
+- [Pre-job layered module-readiness audit — 2026-10-03](AUDIT-pre-job-readiness-2026-10-03.yaml)
 - [Lead-management portfolio job artifacts](lead-management/README.md)
 - [Lead-management visual status map](lead-management/STATUS-MAP.md)
 - [Lead-management provider cost checklist](lead-management/COSTS.md)
