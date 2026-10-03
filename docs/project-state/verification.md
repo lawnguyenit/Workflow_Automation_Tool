@@ -2,7 +2,7 @@
 
 ## Checks completed
 
-- GHL contact upsert adapter added after review of official HighLevel v3 upsert, private integration, tag, and rate-limit docs. Its dedicated suite returned **8 passed**; the full repository suite returned **84 passed, 1 Starlette deprecation warning**. `compileall` and `git diff --check` passed. Synthetic transport tests only; no live GHL request or CRM side effect was made.
+- GHL contact upsert adapter added after review of official HighLevel v3 upsert, private integration, tag, and rate-limit docs. Its suite and runtime/API-boundary checks returned **20 passed**; the full repository suite returned **86 passed, 1 Starlette deprecation warning**. `compileall` and `git diff --check` passed. Synthetic transport tests only; no live GHL request or CRM side effect was made.
 
 - Final focused suite after independent-audit fixes: `.venv\Scripts\python.exe -m pytest -q` returned **76 passed, 1 Starlette deprecation warning**; `compileall` and `git diff --check` passed.
 - Applied `infra/postgres/migrations/002-lead-management.sql` to the already-running Compose PostgreSQL volume. The repeatable migration created `workflow_leads` and recorded schema version 1.

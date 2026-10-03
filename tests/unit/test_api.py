@@ -1,5 +1,4 @@
 from fastapi.testclient import TestClient
-
 from workflow_automation.api import create_app
 from workflow_automation.contracts import ExecutionContext, RunMode
 
@@ -13,6 +12,23 @@ def test_catalog_and_health_are_available():
         "storage.record", "notify.send", "lead.intake", "lead.store",
         "crm.ghl_upsert_contact",
     }
+
+
+def test_ghl_module_endpoint_is_exposed_without_leaking_runtime_token(monkeypatch):
+    monkeypatch.setenv("GHL_LOCATION_ID", "synthetic-location")
+    monkeypatch.setenv("GHL_PRIVATE_INTEGRATION_TOKEN", "synthetic-secret")
+    client = TestClient(create_app())
+    catalog = client.get("/v1/catalog").json()
+    module_instance = next(item for item in catalog["instances"]
+                           if item["instance_id"] == "portfolio.ghl_contact_upsert")
+    assert module_instance["config"] == {"location_id": "synthetic-location"}
+    assert "synthetic-secret" not in str(catalog)
+
+    response = client.post("/v1/instances/portfolio.ghl_contact_upsert/runs", json={
+        "payload": {"contact": {"email": "ada@example.invalid", "name": "Ada Example"}},
+    })
+    assert response.status_code == 200
+    assert response.json()["business_result"] == {"state": "PREVIEWED", "side_effect": False}
 
 
 def test_portfolio_runs_end_to_end_in_dry_run_without_external_services():

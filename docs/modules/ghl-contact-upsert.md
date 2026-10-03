@@ -7,7 +7,8 @@ Status: implemented and verified with synthetic HTTP transport tests; not verifi
 - Capability: `crm.ghl_upsert_contact`; Python implementation uses HighLevel API v3 `POST /contacts/upsert`.
 - Input: `{ "contact": { ...mapped HighLevel contact fields... } }`. The configured `location_id` is added by the module. Contact must include email or phone for HighLevel's configured duplicate matching.
 - Output contains only `state`, `contact_id`, `new`, and `side_effect`; it does not echo contact fields or provider response bodies.
-- Provider token is read from `GHL_PRIVATE_INTEGRATION_TOKEN` unless injected by the runtime. Do not commit it or put it into workflow exports. `REAL` requires a token; `MOCK`, `DRY_RUN`, and `REPLAY` make no network calls.
+- For this module-backed API implementation, the provider token is read from `GHL_PRIVATE_INTEGRATION_TOKEN` in the API runtime environment. Do not commit it or put it into workflow exports/n8n HTTP node data. `REAL` requires a token; `MOCK`, `DRY_RUN`, and `REPLAY` make no network calls. If a workflow calls GHL directly with n8n's native node, use n8n's credential store instead.
+- When `GHL_LOCATION_ID` is set at API startup, the runtime binds `portfolio.ghl_contact_upsert` so n8n can call `/v1/instances/portfolio.ghl_contact_upsert/runs`. Without a Location ID, no live-configured instance is listed. The Location ID is account configuration, not a secret; the token remains in the API runtime secret environment.
 - `Version: v3` and a fixed HTTPS provider endpoint are used. No caller-supplied URL is accepted.
 - Contact fields are allow-listed. `tags` is rejected because the provider documents that upsert replaces all existing tags; implement tagging as a separate add/remove operation after target tag behavior is agreed.
 
@@ -24,5 +25,6 @@ Status: implemented and verified with synthetic HTTP transport tests; not verifi
 ## Evidence and remaining gaps
 
 - Synthetic tests verify the v3 URL/version/auth envelope, allow-list, PII suppression, no-network preview modes, 401/403 handling, rate-limit hint, and uncertain remote outcomes.
+- Registry tests verify the module instance is omitted without a Location ID and becomes callable in preview mode when configured; no token value is placed in instance metadata.
 - No live token, Location ID, field mapping, or duplicate policy is configured. No contact was created or updated. Live end-to-end behavior remains unverified.
 - API references: [Upsert Contact](https://marketplace.gohighlevel.com/docs/ghl/contacts/upsert-contact/index.html), [Add Tags](https://marketplace.gohighlevel.com/docs/ghl/contacts/add-tags/), [Private Integrations](https://marketplace.gohighlevel.com/docs/Authorization/PrivateIntegrationsToken/index.html), and [Rate Limits](https://marketplace.gohighlevel.com/docs/other/rate-limits/index.html).

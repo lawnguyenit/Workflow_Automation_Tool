@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from workflow_automation.definitions import (
     EXECUTOR_DEFINITIONS,
     LEAD_MANAGEMENT_WORKFLOW,
@@ -11,6 +13,8 @@ from workflow_automation.definitions import (
     PORTFOLIO_WORKFLOW_INSTANCE,
 )
 from workflow_automation.executors import PythonExecutor
+from workflow_automation.models import ModuleInstance
+from workflow_automation.modules.crm.ghl_upsert_contact import GHLUpsertContact
 from workflow_automation.modules.input.email_ingest import EmailIngest
 from workflow_automation.modules.output.notify import NotifySend
 from workflow_automation.modules.processing.lead_intake import LeadIntake
@@ -34,6 +38,16 @@ def build_registry(additional_module_instances=None) -> FrameworkRegistry:
     registry.bind_executor("python.local", PythonExecutor())
 
     instance_catalog = [*MODULE_INSTANCES, *(additional_module_instances or [])]
+    ghl_location_id = os.getenv("GHL_LOCATION_ID", "").strip()
+    if ghl_location_id and not any(item.instance_id == "portfolio.ghl_contact_upsert"
+                                   for item in instance_catalog):
+        instance_catalog.append(ModuleInstance(
+            instance_id="portfolio.ghl_contact_upsert",
+            module="crm.ghl_upsert_contact",
+            implementation="crm.ghl_upsert_contact.http.v1",
+            executor_id="python.local",
+            config={"location_id": ghl_location_id},
+        ))
     stores: dict[str, PostgresStore] = {}
     for item in instance_catalog:
         registry.add_instance(item)
@@ -76,6 +90,11 @@ def build_registry(additional_module_instances=None) -> FrameworkRegistry:
             module = LeadIntake()
         elif item.module == "lead.store":
             module = PostgresLeadStore()
+        elif item.module == "crm.ghl_upsert_contact":
+            module = GHLUpsertContact(
+                location_id=config.get("location_id", ""),
+                timeout_seconds=config.get("timeout_seconds", 15),
+            )
         else:
             raise ValueError(f"No module factory is registered for capability {item.module}")
         registry.bind_instance_module(item.instance_id, module)
