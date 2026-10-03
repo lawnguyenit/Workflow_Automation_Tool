@@ -11,6 +11,7 @@ This directory separates the requested direction, accepted decisions, actual imp
 - [Release 0.10.0 independent audit](AUDIT-0.10.0.yaml)
 - [Current independent lead brief audit](AUDIT-0.10.1.yaml)
 - [Release 0.11.0 independent audit](AUDIT-0.11.0.yaml)
+- [Release 0.12.0 verification](verification.md#current-release-0120--pii-minimized-workflow-incident-log)
 - [Current full-brief independent audit](AUDIT-0.12.0.yaml)
 - [Lead-management portfolio job artifacts](lead-management/README.md)
 - [Initial plan](../plan.md)

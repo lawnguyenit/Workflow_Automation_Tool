@@ -1,4 +1,16 @@
-## Current release 0.11.0 — Durable source poll checkpoint
+## Current release 0.12.0 — PII-minimized workflow incident log
+
+Release 0.12.0 adds cross-cutting incident recording and operator acknowledgement. It does not complete the supplied Upwork lead-management brief.
+
+### Workflow incident log — 2026-10-03
+
+- `uv run pytest -q`: **190 passed**, one existing Starlette/httpx deprecation warning.
+- Rebuilt the Docker API image at package version 0.12.0 and applied migration 007. The pre-release local table had a draft column name and zero rows; it was renamed to the final `diagnostic_fingerprint` name before verification. Reapplying migration 007 succeeded without changing existing rows.
+- Synthetic-only Compose PostgreSQL + FastAPI integration checked concurrent same-event idempotency, changed-result conflict hold, diagnostic/payload/error-text redaction, authenticated list/detail/resolve behavior, acknowledgement idempotency, and test-row cleanup. No real provider or prospect data was used.
+- `GET /healthz` returned `{"status":"ok"}` after the 0.12.0 container restart, and `GET /v1/catalog` returned the workflow catalog (4 definitions).
+- Persistence is best effort; no external alert delivery, automated retry, DLQ worker, pagination, retention policy, or production monitoring is provided. The full lead path remains incomplete.
+
+### Prior release 0.11.0 — Durable source poll checkpoint
 
 Release 0.10.0 and earlier sections below are historical evidence snapshots. This release adds a per-source PostgreSQL lease/checkpoint to the read-only Google Forms polling template; it does not complete the supplied Upwork brief.
 

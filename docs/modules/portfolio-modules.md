@@ -65,6 +65,13 @@ Every result includes `module_id`, contract version, `SUCCESS` / `PARTIAL` / `FA
 
 ## Execution/deployment: API, Docker Compose and n8n
 
+### Cross-cutting: workflow incident log
+
+- `PostgresWorkflowIncidentLog` records bounded metadata for `MOCK`/`REAL` runs ending `PARTIAL`, `FAILURE`, or `REVIEW_REQUIRED`. Successful and `DRY_RUN`/`REPLAY` runs are skipped. Same workflow/run/attempt and same diagnostics are idempotent; changed diagnostics for that event are held for review.
+- The allowlist stores step/module IDs, statuses, safe error codes/categories, and retryability. It excludes payloads, business fields, error text, secrets, and raw run/correlation IDs. See [`workflow-incident-log.md`](workflow-incident-log.md) for exact guarantees and limits.
+- Authenticated operator routes list at most 100 incidents, fetch one, and record an acknowledgement code. Resolution never retries work or confirms a remote side effect. Logging is best effort, so PostgreSQL downtime can lose an incident while preserving the workflow result.
+- No external alert delivery, automatic retry, DLQ worker, pagination, retention job, or production monitoring is implemented. Synthetic PostgreSQL/API integration and unit/API tests verify the bounded local behavior; no live provider operation was used.
+
 - Python runner and HTTP API expose catalog, module instance, workflow definition, and workflow instance routes. The n8n template is a manual trigger with six HTTP module-instance nodes and explicit `SUCCESS` gates; n8n composes the modules for this demo. The aggregate workflow endpoint is also available for API-driven execution through the Python runner.
 - The API has optional shared bearer-token authentication. `MOCK`/`REAL` and live Gmail reads require `WORKFLOW_API_KEY`; when it is unset, those operations are rejected. `DRY_RUN`/`REPLAY` are allowed without the key to support the n8n demo. The API does not enforce synthetic-only preview payloads or verify that replay inputs are captured and sanitized. This is a single shared key, not per-user authorization or role separation. Keep the API on loopback/private service networking and add deployment-grade identity, TLS, rotation, and access policy before publishing it outside a trusted network.
 - Compose separates n8n's database from workflow data in PostgreSQL and binds published ports to loopback. The app runs as non-root. `.env.example` contains placeholders only. The image installs the locked Python environment using uv; the Docker build and local Compose startup have been verified.

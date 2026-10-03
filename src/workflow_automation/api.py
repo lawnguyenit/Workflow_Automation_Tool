@@ -3,15 +3,19 @@ from __future__ import annotations
 import logging
 import hmac
 import os
-from typing import Any
+from typing import Any, Literal
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from workflow_automation import __version__
 from workflow_automation.contracts import ExecutionContext, ModuleError, ModuleResult, ResultState, Retryability, RunMode
 from workflow_automation.registry_factory import build_registry
 from workflow_automation.runner import WorkflowRunner
+from workflow_automation.infrastructure.postgres_workflow_incidents import (
+    PostgresWorkflowIncidentLog,
+    WorkflowIncidentLogError,
+)
 
 logger = logging.getLogger("workflow_automation.api")
 
@@ -29,6 +33,33 @@ def _authorize_run(context: ExecutionContext, authorization: str | None,
             raise HTTPException(status_code=401, detail="Valid bearer token required")
         return
     raise HTTPException(status_code=503, detail="This execution requires WORKFLOW_API_KEY")
+
+
+def _authorize_incident_access(authorization: str | None) -> None:
+    expected = os.getenv("WORKFLOW_API_KEY")
+    if not expected:
+        raise HTTPException(status_code=503, detail="Incident access requires WORKFLOW_API_KEY")
+    supplied = authorization[7:] if authorization and authorization.startswith("Bearer ") else ""
+    if not hmac.compare_digest(supplied, expected):
+        raise HTTPException(status_code=401, detail="Valid bearer token required")
+
+
+def _record_incident(incident_log: PostgresWorkflowIncidentLog, *, workflow_id: str,
+                     context: ExecutionContext, result: dict[str, Any]) -> dict[str, Any] | None:
+    if context.mode not in (RunMode.MOCK, RunMode.REAL):
+        return None
+    try:
+        return incident_log.record_result(
+            workflow_id=workflow_id, run_id=context.run_id, attempt=context.attempt,
+            mode=context.mode.value, result=result,
+        )
+    except WorkflowIncidentLogError as exc:
+        logger.warning("Workflow incident could not be recorded workflow_id=%s error_code=%s",
+                       workflow_id, exc.code)
+    except Exception as exc:
+        logger.warning("Workflow incident could not be recorded workflow_id=%s exception_type=%s",
+                       workflow_id, type(exc).__name__)
+    return None
 
 
 def _public_workflow_result(result: dict[str, Any]) -> dict[str, Any]:
@@ -66,12 +97,21 @@ class WorkflowRunRequest(BaseModel):
     context: ExecutionContext | None = None
 
 
+class IncidentResolutionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    resolution_code: Literal[
+        "RETRY_COMPLETED", "PROVIDER_STATE_CONFIRMED", "MANUAL_REPAIR",
+        "DUPLICATE_CONFIRMED", "DISMISSED",
+    ]
+
+
 def create_app() -> FastAPI:
     registry = build_registry()
     runner = WorkflowRunner(registry)
     app = FastAPI(title="Workflow Automation Module API", version=__version__)
     app.state.registry = registry
     app.state.runner = runner
+    app.state.incident_log = PostgresWorkflowIncidentLog()
 
     @app.get("/healthz")
     def health() -> dict[str, str]:
@@ -86,6 +126,43 @@ def create_app() -> FastAPI:
             "workflows": [item.model_dump(mode="json") for item in registry.workflow_definitions.values()],
             "workflow_instances": [item.model_dump(mode="json") for item in registry.workflow_instances.values()],
         }
+
+    @app.get("/v1/incidents")
+    def list_incidents(include_resolved: bool = False, limit: int = Query(default=50, ge=1, le=100),
+                       authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        _authorize_incident_access(authorization)
+        try:
+            return {"incidents": app.state.incident_log.list_incidents(
+                include_resolved=include_resolved, limit=limit)}
+        except WorkflowIncidentLogError as exc:
+            raise HTTPException(status_code=503, detail=exc.code) from None
+
+    @app.post("/v1/incidents/{incident_id}/resolve")
+    def resolve_incident(incident_id: str, request: IncidentResolutionRequest,
+                         authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        _authorize_incident_access(authorization)
+        try:
+            result = app.state.incident_log.resolve(
+                incident_id=incident_id, resolution_code=request.resolution_code)
+        except WorkflowIncidentLogError as exc:
+            status = 400 if exc.code in {"INVALID_INCIDENT_ID", "INVALID_RESOLUTION_CODE"} else 503
+            raise HTTPException(status_code=status, detail=exc.code) from None
+        if not result["found"]:
+            raise HTTPException(status_code=404, detail="Incident not found")
+        return result
+
+    @app.get("/v1/incidents/{incident_id}")
+    def get_incident(incident_id: str,
+                     authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        _authorize_incident_access(authorization)
+        try:
+            result = app.state.incident_log.get_incident(incident_id=incident_id)
+        except WorkflowIncidentLogError as exc:
+            status = 400 if exc.code == "INVALID_INCIDENT_ID" else 503
+            raise HTTPException(status_code=status, detail=exc.code) from None
+        if result is None:
+            raise HTTPException(status_code=404, detail="Incident not found")
+        return result
 
     @app.post("/v1/instances/{instance_id}/runs")
     def run_instance(instance_id: str, request: ModuleRunRequest,
@@ -124,6 +201,14 @@ def create_app() -> FastAPI:
                     "qualification": lead.get("qualification", {}) if isinstance(lead, dict) else {},
                     "prompt_version": public_result.get("business_result", {}).get("prompt_version"),
                 }
+        incident = _record_incident(
+            app.state.incident_log,
+            workflow_id=f"module:{instance_id}",
+            context=context,
+            result={"status": public_result["status"], "steps": {"execute": public_result}},
+        )
+        if incident:
+            public_result["incident"] = incident
         return public_result
 
     @app.post("/v1/workflows/{workflow_id}/runs")
@@ -157,10 +242,25 @@ def create_app() -> FastAPI:
         except Exception as exc:
             logger.error("Workflow invocation failed workflow_id=%s run_id=%s exception_type=%s",
                          workflow_id, context.run_id, type(exc).__name__)
+            _record_incident(
+                app.state.incident_log,
+                workflow_id=workflow_id,
+                context=context,
+                result={"status": "FAILURE", "steps": {"workflow": {
+                    "module_id": "workflow.runner", "status": "FAILURE",
+                    "errors": [{"code": "WORKFLOW_INVOCATION_FAILED", "category": "RUNTIME",
+                                "retryability": "UNKNOWN"}],
+                }}},
+            )
             raise HTTPException(status_code=500, detail="Workflow invocation failed; inspect server diagnostics") from None
         logger.info("Workflow run finished workflow_id=%s run_id=%s status=%s", workflow_id,
                     context.run_id, result["status"])
-        return _public_workflow_result(result)
+        public_result = _public_workflow_result(result)
+        incident = _record_incident(app.state.incident_log, workflow_id=workflow_id,
+                                    context=context, result=result)
+        if incident:
+            public_result["incident"] = incident
+        return public_result
 
     @app.post("/v1/workflow-instances/{workflow_instance_id}/runs")
     def run_workflow_instance(workflow_instance_id: str, request: WorkflowRunRequest,
@@ -187,10 +287,25 @@ def create_app() -> FastAPI:
         except Exception as exc:
             logger.error("Workflow instance invocation failed instance_id=%s run_id=%s exception_type=%s",
                          workflow_instance_id, context.run_id, type(exc).__name__)
+            _record_incident(
+                app.state.incident_log,
+                workflow_id=workflow_id,
+                context=context,
+                result={"status": "FAILURE", "steps": {"workflow": {
+                    "module_id": "workflow.runner", "status": "FAILURE",
+                    "errors": [{"code": "WORKFLOW_INVOCATION_FAILED", "category": "RUNTIME",
+                                "retryability": "UNKNOWN"}],
+                }}},
+            )
             raise HTTPException(status_code=500, detail="Workflow invocation failed; inspect server diagnostics") from None
         logger.info("Workflow instance run finished instance_id=%s run_id=%s status=%s",
                     workflow_instance_id, context.run_id, result["status"])
-        return _public_workflow_result(result)
+        public_result = _public_workflow_result(result)
+        incident = _record_incident(app.state.incident_log, workflow_id=workflow_id,
+                                    context=context, result=result)
+        if incident:
+            public_result["incident"] = incident
+        return public_result
 
     return app
 

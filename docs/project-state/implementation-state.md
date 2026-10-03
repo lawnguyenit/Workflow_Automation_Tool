@@ -2,6 +2,8 @@
 
 ## Current verified state
 
+Release 0.12.0 adds cross-cutting `PostgresWorkflowIncidentLog` infrastructure. For `MOCK`/`REAL` runs ending `PARTIAL`, `FAILURE`, or `REVIEW_REQUIRED`, it stores only bounded diagnostics and a fingerprint, keyed idempotently by workflow/run/attempt digest. Authenticated API routes list (up to 100), fetch, and acknowledge incidents; acknowledgement does not retry or verify external state. Writes are best effort and may be lost when PostgreSQL is unavailable. There is no external alert, DLQ worker, retry scheduler, pagination, or retention job. See `docs/modules/workflow-incident-log.md`, `docs/runbooks/workflow-incidents.md`, and `docs/releases/0.12.0.md`.
+
 - The approved framework and synthetic Intelligent Document Intake portfolio are implemented under `src/workflow_automation/`.
 - Core includes shared result/execution contracts, capability/implementation/instance/executor/workflow-definition/workflow-instance models, validated registry, Python and HTTP executors, generic workflow runner, and FastAPI module/catalog/workflow routes.
 - Reference modules include fixture/Gmail read ingestion, bounded PDF text extraction, deterministic/strict-schema LLM extraction, configurable validation, PostgreSQL idempotent record storage, and Slack notification with an outbox.
