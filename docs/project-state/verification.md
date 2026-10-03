@@ -7,6 +7,7 @@
 - Synthetic Compose/PostgreSQL GHL tag integration used `httpx.MockTransport`, not HighLevel. Two overlapping same-contact calls made one provider request; a simulated timeout returned `REMOTE_OUTCOME_UNKNOWN` and blocked retry for reconciliation. Test reconciliation rows were removed by the script.
 - Both integration scripts ran in the rebuilt Compose API container. `GET /healthz` returned `{"status":"ok"}`; OpenAPI reports `0.9.0`; catalog includes `crm.ghl_contact_tags`. Docker API was rebuilt from the current source. n8n and PostgreSQL remained running.
 - No OpenAI, Google Forms, or HighLevel live request was made. No owner rubric, GHL Location/token/tag policy, or model request cap is configured, so these live modules are not ready for a real lead. The call cap is a request count, not USD spend; live model use also needs an account-side budget. No live provider quality, cost, retention, or account behavior has been verified.
+- Read-only connected Google Drive account probe found the linked `Lead Intake Lab - Test Only (Câu trả lời)` response spreadsheet with `shared=false`. Metadata shows one tab, `Câu trả lời biểu mẫu 1`; a bounded read of `A1:L3` returned only the six-column header row (timestamp, name, email, optional phone, service, request description), with no response row. This verifies the linked Sheet through the Drive/Sheets connector only; it does not verify Google Forms API access, OAuth scopes in n8n, Form publication state, or poller execution. No account-specific file ID is stored in this repository.
 
 ---
 
