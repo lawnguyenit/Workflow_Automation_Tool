@@ -7,6 +7,7 @@ This directory separates the requested direction, accepted decisions, actual imp
 - [Implementation state](implementation-state.md)
 - [Impact map](impact-map.md)
 - [Verification and gaps](verification.md)
+- [Lead-management independent audit](lead-management-audit.md)
 - [Initial plan](../plan.md)
 
 State vocabulary: `requested`, `proposed`, `approved`, `implemented`, `verified`, `accepted`, `blocked`, `rejected`, `unknown`.

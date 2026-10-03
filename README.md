@@ -6,7 +6,7 @@ Build a reusable library of workflow module contracts and, when jobs require the
 
 ## Working rule
 
-Keep the capability model platform-neutral and implementations replaceable. The first approved reference system is the Intelligent Document Intake Pipeline in `docs/plan.md`; use synthetic fixtures/mock integrations for safe local execution, and document any real-provider connections as unverified until credentials and target environments are available. Grow the wider catalog from real job demand.
+Keep the capability model platform-neutral and implementations replaceable. The initial reference system is the Intelligent Document Intake Pipeline. A second local lead-management reference now exercises webhook-shaped intake, manual-review status, and PostgreSQL source-event idempotency. These are portfolio systems, not client deployments; document any provider connection as unverified until credentials and target environments are available. Grow the wider catalog from real job demand.
 
 ## Pipeline areas
 
@@ -45,6 +45,12 @@ The API returns sanitized step states and invoice fields; it omits attachment by
 
 For an opt-in PostgreSQL/n8n local stack, copy `.env.example` to `.env`, replace the PostgreSQL and n8n local-only secrets, then run `docker compose up --build`. Set a long random `WORKFLOW_API_KEY` before allowing `MOCK`/`REAL` calls or live Gmail reads. Use a URL-safe PostgreSQL password (letters, numbers, hyphen, underscore) because Compose passes it inside `DATABASE_URL`. The app is available on `127.0.0.1:8000` and n8n on `127.0.0.1:5678`. Import `workflows/n8n/intelligent-document-intake.demo.json`; its six HTTP nodes call the module-instance API individually in `DRY_RUN` and gate each step on `SUCCESS`. The JSON is a starter template and needs validation against the exact n8n image/version selected for a job. If the workflow is changed to `MOCK`/`REAL` or live Gmail input, configure matching Header Auth credentials on the n8n HTTP nodes. Never use the demo workflow to handle client documents without reviewing n8n execution-data retention and access first.
 
+### Lead-management reference
+
+`workflows/n8n/lead-management-local.demo.json` is a private, manual-trigger preview with a synthetic `.invalid` email address. It invokes `portfolio.lead_management_local` in `DRY_RUN`, so it does not write to PostgreSQL or send a message. The real local API/DB path has also been exercised separately with synthetic payloads in `MOCK` mode: first-write, same-event duplicate, changed-payload conflict, missing-field review, and API response redaction. Current results intentionally end at `REVIEW_REQUIRED`; there is no configured GHL, qualification rubric, OpenAI API, email sender, or public form callback. See [lead-management module contract and limits](docs/modules/lead-management-reference.md).
+
+The private Google Form draft `Lead Intake Lab - Test Only` is unpublished and linked to a response Sheet. Local n8n and API ports bind to loopback. Do not publish the form or expose a public callback unless the owner explicitly requests it after the access and data-handling setup is understood. The user's VPS that hosts an online game is outside this project.
+
 ### Execution modes
 
 - `DRY_RUN`: preview extraction and validation; PostgreSQL writes and output side effects are skipped. The API does not restrict inputs to fixtures, so caller-supplied business data may be processed.
@@ -52,4 +58,4 @@ For an opt-in PostgreSQL/n8n local stack, copy `.env.example` to `.env`, replace
 - `MOCK`: deterministic/mock extraction; PostgreSQL and the notification outbox are written, but no output provider is contacted. Use only with a deliberate local/test database.
 - `REAL`: Gmail read, OpenAI extraction, PostgreSQL, and Slack can run only when each is configured. This mode is not an end-to-end claim and needs per-client authorization, policy, credentials, retention, and operational setup.
 
-Details on duplicate handling, concurrency, limits, recovery, and unverified integrations are in [portfolio module guarantees](docs/modules/portfolio-modules.md). The changelog for this implementation is [0.1.0](docs/releases/0.1.0.md).
+Details on duplicate handling, concurrency, limits, recovery, and unverified integrations are in [portfolio module guarantees](docs/modules/portfolio-modules.md). Release notes: [0.1.0](docs/releases/0.1.0.md), [0.2.0](docs/releases/0.2.0.md).

@@ -39,6 +39,11 @@ def _public_workflow_result(result: dict[str, Any]) -> dict[str, Any]:
         projected = dict(step_result)
         if step_id in {"email", "document"}:
             projected["business_result"] = {}
+        elif step_id == "intake":
+            lead = projected.get("business_result", {}).get("lead")
+            projected["business_result"] = {
+                "qualification": lead.get("qualification", {}) if isinstance(lead, dict) else {}
+            }
         public_steps[step_id] = projected
     public_result["steps"] = public_steps
     return public_result
@@ -59,7 +64,7 @@ class WorkflowRunRequest(BaseModel):
 def create_app() -> FastAPI:
     registry = build_registry()
     runner = WorkflowRunner(registry)
-    app = FastAPI(title="Workflow Automation Module API", version="0.1.0")
+    app = FastAPI(title="Workflow Automation Module API", version="0.2.0")
     app.state.registry = registry
     app.state.runner = runner
 
@@ -103,7 +108,13 @@ def create_app() -> FastAPI:
             ).complete()
         logger.info("Module run finished instance_id=%s run_id=%s status=%s", instance_id,
                     context.run_id, result.status.value)
-        return result.model_dump(mode="json")
+        public_result = result.model_dump(mode="json")
+        if instance.module == "lead.intake":
+            lead = public_result.get("business_result", {}).get("lead")
+            public_result["business_result"] = {
+                "qualification": lead.get("qualification", {}) if isinstance(lead, dict) else {}
+            }
+        return public_result
 
     @app.post("/v1/workflows/{workflow_id}/runs")
     def run_workflow(workflow_id: str, request: WorkflowRunRequest,

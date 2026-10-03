@@ -1,6 +1,6 @@
 # Workflow Automation Framework — Implementation Plan
 
-**Status:** Initial document-intake reference is implemented; the next lead-management reference instance is approved and in intake, with real account inventory pending (2026-10-03).
+**Status:** Initial document-intake reference is implemented; the lead-management reference instance is approved and moving through bounded local/live-account discovery (2026-10-03).
 **Purpose:** Build a reusable automation framework first, then use the same framework to create concrete, production-style workflow instances for portfolio and future freelance jobs.
 
 ## Execution tracker
@@ -12,8 +12,8 @@
 | 3. End-to-end portfolio workflow | Implemented; local dry-run verified | LLM extraction, validation, PostgreSQL preview, outbox/Slack output and API/n8n entry point are connected. |
 | 4. Safe-debug infrastructure | Implemented; local behavior verified | Synthetic fixtures, mocked provider tests, DRY_RUN/MOCK/REPLAY/REAL modes, correlation context, sanitized errors/API response, and recovery statuses. |
 | 5. Reliability hardening | Implemented partially; scoped checks verified | Source-key conflict behavior, conditional outbox claim, timeout ambiguity, limits, and mock failure cases are covered. Live database races, capacity/load, provider rate limits, queues/backpressure, and production observability remain untested or not implemented. |
-| 6–7. Demand-driven catalog and job binding | Active for the lead-management reference instance | The supplied GHL lead job and the user's request establish a concrete next instance; map capabilities to reuse/adapt/new after account inventory and business settings are confirmed. |
-| 8. Lead-management portfolio instance | `INTAKE` / waiting on user-owned account details | Target: one input source → normalize/validate → qualification and review path → GHL contact/opportunity → acknowledgement/follow-up with stop conditions → logs/recovery/docs. First live test should use synthetic test data in the user's own authorized accounts. |
+| 6–7. Demand-driven catalog and job binding | Active; account facts captured, exact external adapters remain account-blocked | Lead-management intake requirements are mapped to two reusable modules; GHL/LLM/email provider bindings remain unavailable until the user has the account/configuration and approved business rules. |
+| 8. Lead-management portfolio instance | Local synthetic reference implemented and integration-verified; supplied Upwork scope is only partially implemented | Local API + Docker PostgreSQL handle normalization, manual-review qualification, source-event idempotency and changed-payload conflict. GHL, AI, outbound messages, suppression events and public form ingress remain open capabilities. |
 
 ### Lead-management intake snapshot
 
@@ -21,14 +21,15 @@
 |---|---|---|
 | Business outcome and initial scope | Confirmed | Supplied Upwork brief: capture one enquiry source, qualify, upsert GHL contact/opportunity, send approved follow-up, stop on reply/booking/opt-out/pause. |
 | Build a concrete instance and reuse new capabilities | Confirmed | User explicitly asked to start, finish, and test on available real accounts; framework gaps exposed by the instance become reusable modules. |
-| CRM account and test location | Unknown; blocking for GHL live run | User to identify whether a GHL account/location and a test pipeline are available. No credential values in chat. |
-| Input source and public callback reachability | Unknown; blocking for end-to-end source test | User to identify an existing form/source or approve a local webhook test; a cloud form needs a public HTTPS callback, while current Compose ports bind to loopback. |
-| Sender account | Unknown; blocking for live acknowledgement | User to identify provider and permit a single test message only to an address they control. |
-| Qualification criteria, fields, pipeline/stage, and message/stop behavior | Material business choices unresolved | Use the supplied brief as requirements; ask the user to define or explicitly approve a small demonstration rubric and test-only message before those side effects. |
-| LLM provider | Optional / unknown | A deterministic/manual-review path can be tested without API billing; real LLM calls require an available provider credential. |
-| Policy and data-handling facts | Unresolved for production leads | First live run is bounded to synthetic test data; before handling real prospects, establish source notice/consent, jurisdictions, retention, recipients, and whether follow-up is transactional or marketing. |
+| Local lead intake modules | Implemented; unit and Docker PostgreSQL API integration verified | `lead.intake` and `lead.store`, release `0.2.0`; first insert, identical duplicate, changed-payload conflict, missing-field review and response redaction were observed with synthetic data. |
+| CRM account and test location | No CRM/GHL account identified; blocks GHL live run | User does not know what CRM/GHL is and has not said they own an account. No GHL adapter is implemented; add it when a test account, scopes, field mapping, and pipeline rules are available. Do not create third-party CRM data. |
+| Input source and public callback reachability | Test-only Google Form and linked response Sheet created; form remains unpublished with zero responses | Local n8n/API bind to loopback only. User has no public HTTPS endpoint; listed VPS hosts an online game and must remain untouched. Use a local synthetic webhook for current execution. Do not publish or tunnel the form without a separate explicit instruction. |
+| Sender account | Gmail and Outlook available; 2FA enabled; sender not configured | User permits one test email only to an address they control. Configure credentials directly in n8n/provider UI if needed; never request secrets in chat. No email sent yet. |
+| Qualification criteria, fields, pipeline/stage, and message/stop behavior | Material business choices unresolved | Do not invent sales criteria or marketing. Use a fail-closed `REVIEW_REQUIRED`/manual-review default; create no automated nurture until the owner defines/approves criteria, exact content and stop rules. |
+| LLM provider | No OpenAI API account/key; ChatGPT Plus only | Keep live LLM calls disabled. Use deterministic extraction/required-field checks and mark uncertainty for review; do not claim Plus includes API usage. |
+| Policy and data-handling facts | Unresolved for production leads | First test is synthetic-only, with no third-party contacts. Before real prospects, establish source notice/consent, jurisdictions, retention, recipients, provider terms/regions, and whether follow-up is transactional or marketing. |
 
-Current readiness: **`BLOCKED_BY_USER` for the end-to-end real-account run**. Repository inspection, official API research, module contracts, synthetic tests, and workflow design can continue independently. Do not send email or create CRM records until the user confirms the available account and test side effects.
+Current readiness: **`LOCAL_SYNTHETIC_REFERENCE_IMPLEMENTED`; `BLOCKED_BY_ACCOUNT` for GHL/LLM/live form ingress; `CONDITIONALLY_READY` for one self-addressed email after credential setup.** Four synthetic rows exist in the local test database. No email or CRM side effect has happened. The unpublished form and linked Sheet have zero responses. The n8n UI requires sign-in; the workflow export has not been imported or run there. Do not touch the game VPS, publish the form, expose a public callback, or use real prospects without the required access/approval and data-handling facts.
 
 ---
 

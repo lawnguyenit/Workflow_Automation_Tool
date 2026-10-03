@@ -10,7 +10,7 @@ def test_catalog_and_health_are_available():
     catalog = client.get("/v1/catalog").json()
     assert {module["module_id"] for module in catalog["modules"]} == {
         "email.ingest", "document.extract", "llm.structured_extract", "data.validate",
-        "storage.record", "notify.send",
+        "storage.record", "notify.send", "lead.intake", "lead.store",
     }
 
 
@@ -43,6 +43,47 @@ def test_workflow_instance_endpoint_uses_sanitized_workflow_output():
     assert response.status_code == 200
     assert response.json()["workflow_instance_id"] == "portfolio.intelligent_document_intake"
     assert "content_base64" not in response.text
+
+
+def test_lead_workflow_dry_run_is_sanitized_and_review_first():
+    client = TestClient(create_app())
+    response = client.post("/v1/workflow-instances/portfolio.lead_management_local/runs", json={
+        "payload": {"lead": {
+            "source_system": "test", "source_account": "local", "source_event_id": "test-1",
+            "name": "Taylor Example", "email": "taylor@example.invalid", "phone": "",
+            "service_requested": "Automation", "description": "Synthetic only",
+        }}
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "REVIEW_REQUIRED"
+    assert body["steps"]["intake"]["business_result"]["qualification"]["status"] == "REVIEW_REQUIRED"
+    assert body["result"]["state"] == "PREVIEWED"
+    assert body["steps"]["store"]["status"] == "REVIEW_REQUIRED"
+    assert "Taylor Example" not in response.text
+    assert "taylor@example.invalid" not in response.text
+
+
+def test_direct_lead_intake_route_exposes_review_reason_but_not_lead_pii(monkeypatch):
+    monkeypatch.setenv("WORKFLOW_API_KEY", "test-only-api-key")
+    client = TestClient(create_app())
+    response = client.post("/v1/instances/portfolio.lead_intake/runs", headers={
+        "Authorization": "Bearer test-only-api-key",
+    }, json={
+        "payload": {"lead": {
+            "source_system": "test", "source_account": "local", "source_event_id": "test-2",
+            "name": "Taylor Example", "email": "taylor@example.invalid", "phone": "",
+            "service_requested": "Automation", "description": "Synthetic only",
+        }},
+        "context": ExecutionContext(workflow_id="lead_management_intake", mode=RunMode.MOCK).model_dump(mode="json"),
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "PARTIAL"
+    assert body["business_result"]["qualification"]["status"] == "REVIEW_REQUIRED"
+    assert "qualification_criteria_not_configured" in body["business_result"]["qualification"]["reasons"]
+    assert "Taylor Example" not in response.text
+    assert "taylor@example.invalid" not in response.text
 
 
 def test_real_execution_is_blocked_until_api_key_is_configured(monkeypatch):

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from workflow_automation.definitions import (
     EXECUTOR_DEFINITIONS,
+    LEAD_MANAGEMENT_WORKFLOW,
+    LEAD_MANAGEMENT_WORKFLOW_INSTANCE,
     MODULE_DEFINITIONS,
     MODULE_IMPLEMENTATIONS,
     MODULE_INSTANCES,
@@ -11,10 +13,12 @@ from workflow_automation.definitions import (
 from workflow_automation.executors import PythonExecutor
 from workflow_automation.modules.input.email_ingest import EmailIngest
 from workflow_automation.modules.output.notify import NotifySend
+from workflow_automation.modules.processing.lead_intake import LeadIntake
 from workflow_automation.modules.processing.document_extract import DocumentExtract
 from workflow_automation.modules.processing.llm_structured_extract import LLMStructuredExtract
 from workflow_automation.modules.processing.validate import Validate
 from workflow_automation.modules.storage.postgres_store import PostgresStore
+from workflow_automation.modules.storage.postgres_lead_store import PostgresLeadStore
 from workflow_automation.registry import FrameworkRegistry
 
 
@@ -68,9 +72,15 @@ def build_registry(additional_module_instances=None) -> FrameworkRegistry:
             if store is None:
                 raise ValueError(f"Notification instance {item.instance_id} references unavailable storage instance {store_instance_id}")
             module = NotifySend(store=store, timeout_seconds=config.get("timeout_seconds", 10))
+        elif item.module == "lead.intake":
+            module = LeadIntake()
+        elif item.module == "lead.store":
+            module = PostgresLeadStore()
         else:
             raise ValueError(f"No module factory is registered for capability {item.module}")
         registry.bind_instance_module(item.instance_id, module)
     registry.add_workflow(PORTFOLIO_WORKFLOW)
     registry.add_workflow_instance(PORTFOLIO_WORKFLOW_INSTANCE)
+    registry.add_workflow(LEAD_MANAGEMENT_WORKFLOW)
+    registry.add_workflow_instance(LEAD_MANAGEMENT_WORKFLOW_INSTANCE)
     return registry

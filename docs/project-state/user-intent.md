@@ -15,6 +15,16 @@
 - Build a concrete lead-management portfolio instance from the supplied GHL job brief and take it beyond a mock by running authorized tests against the user's own available service accounts. Add reusable modules to the framework where the instance exposes a capability gap. Keep credentials out of chat/source; distinguish synthetic tests, local integration, authorized live-account runs, and user acceptance.
 - A shared read-only research agent at `../.codex/agents/workflow-module-risk-researcher.toml` checks bounded concerns against current online sources and reports gaps; the established workflow remains unchanged.
 
+## Current account inventory for the lead-management reference
+
+- The user has Gmail and Outlook accounts with two-factor authentication enabled.
+- The user has not identified an existing CRM or GoHighLevel account and asked what CRM/GHL means; explain it in plain language before requesting any account.
+- There was no existing lead form; the user authorized creating one. A private Google Form draft named `Lead Intake Lab - Test Only` and its linked response spreadsheet now exist. The form is unpublished and has zero responses. It is explicitly labeled for synthetic data and not public lead collection.
+- The user has no known public HTTPS endpoint. VPS `103.178.234.213:2786` hosts an online game; do not connect to, probe, reconfigure, or deploy on it.
+- The user has ChatGPT Plus but no OpenAI API account/key. Keep paid API calls disabled unless the user later provisions a separate API credential directly in a secure UI.
+- The user permits a single test email only if it goes to an address they control and affects no one else. Do not send third-party messages. No message has been sent so far.
+- Use synthetic-only data for current local implementation. Do not publish the form or expose a public callback/tunnel without separate explicit instruction. Do not run live prospect data until purpose, audience/jurisdictions, notice/consent, provider/hosting, retention, and follow-up purpose/content have been established.
+
 ## Assumptions to revisit
 
 - The tool directory name is `Workflow_Automation_Tool`.

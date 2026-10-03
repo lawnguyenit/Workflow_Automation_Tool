@@ -38,6 +38,14 @@ MODULE_DEFINITIONS = [
                      input_schema={"type": "object", "required": ["records"]},
                      output_schema={"type": "object", "required": ["notifications"]},
                      possible_results=["SUCCESS", "PARTIAL", "FAILURE", "REVIEW_REQUIRED"]),
+    ModuleDefinition(module_id="lead.intake", purpose="Normalize a lead enquiry and flag missing or unqualified data for human review.",
+                     input_schema={"type": "object", "required": ["lead"]},
+                     output_schema={"type": "object", "required": ["lead"]},
+                     possible_results=["SUCCESS", "PARTIAL", "FAILURE", "REVIEW_REQUIRED"]),
+    ModuleDefinition(module_id="lead.store", purpose="Persist lead events idempotently by source event key in PostgreSQL.",
+                     input_schema={"type": "object", "required": ["lead"]},
+                     output_schema={"type": "object", "required": ["state", "duplicate"]},
+                     possible_results=["SUCCESS", "PARTIAL", "FAILURE", "REVIEW_REQUIRED"]),
 ]
 
 MODULE_IMPLEMENTATIONS = [
@@ -56,6 +64,12 @@ MODULE_IMPLEMENTATIONS = [
     ModuleImplementation(implementation_id="notify.send.python.reference.v1", implements="notify.send", runtime="python",
                          provider="durable mock outbox or Slack incoming webhook",
                          limitations=["Slack delivery is not exactly-once; timeout outcomes are not retried automatically."]),
+    ModuleImplementation(implementation_id="lead.intake.python.reference.v1", implements="lead.intake", runtime="python",
+                         provider="local webhook payload",
+                         limitations=["No qualification rubric or live LLM is configured; all leads remain for human review."]),
+    ModuleImplementation(implementation_id="lead.store.postgres.v1", implements="lead.store", runtime="python",
+                         provider="PostgreSQL",
+                         limitations=["Dedupe scope is source event only; this is not CRM contact or outbound message deduplication."]),
 ]
 
 MODULE_INSTANCES = [
@@ -76,6 +90,10 @@ MODULE_INSTANCES = [
     ModuleInstance(instance_id="portfolio.notify", module="notify.send",
                    implementation="notify.send.python.reference.v1", executor_id="python.local",
                    config={"provider": "mock"}),
+    ModuleInstance(instance_id="portfolio.lead_intake", module="lead.intake",
+                   implementation="lead.intake.python.reference.v1", executor_id="python.local"),
+    ModuleInstance(instance_id="portfolio.lead_store", module="lead.store",
+                   implementation="lead.store.postgres.v1", executor_id="python.local"),
 ]
 
 PORTFOLIO_WORKFLOW = WorkflowDefinition(
@@ -112,4 +130,23 @@ PORTFOLIO_WORKFLOW_INSTANCE = WorkflowInstance(
         "store": "portfolio.postgres_store",
         "notify": "portfolio.notify",
     },
+)
+
+LEAD_MANAGEMENT_WORKFLOW = WorkflowDefinition(
+    workflow_id="lead_management_intake",
+    version="1",
+    description="Synthetic/local lead intake with strict normalization, manual-review qualification, and idempotent PostgreSQL event storage.",
+    steps=[
+        {"step_id": "intake", "module_id": "lead.intake",
+         "input_mapping": {"lead": "$input.lead"}, "continue_on_partial": True},
+        {"step_id": "store", "module_id": "lead.store",
+         "depends_on": ["intake"], "input_mapping": {"lead": "intake.lead"}},
+    ],
+)
+
+LEAD_MANAGEMENT_WORKFLOW_INSTANCE = WorkflowInstance(
+    instance_id="portfolio.lead_management_local",
+    workflow_definition_id="lead_management_intake",
+    description="Private local synthetic reference; CRM, live AI qualification, and email sending are deliberately unbound.",
+    step_bindings={"intake": "portfolio.lead_intake", "store": "portfolio.lead_store"},
 )

@@ -28,6 +28,24 @@ CREATE TABLE IF NOT EXISTS workflow_invoices (
     CONSTRAINT workflow_invoices_payload_object CHECK (jsonb_typeof(invoice_data) = 'object')
 );
 
+-- Reference lead-management events. An event key prevents a source retry from
+-- creating a second intake row; this does not guarantee CRM-contact/message dedupe.
+CREATE TABLE IF NOT EXISTS workflow_leads (
+    id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    source_system       TEXT NOT NULL,
+    source_account      TEXT NOT NULL,
+    source_event_id     TEXT NOT NULL,
+    lead_data           JSONB NOT NULL,
+    payload_fingerprint CHAR(64) NOT NULL,
+    workflow_id         TEXT NOT NULL,
+    run_id              TEXT NOT NULL,
+    correlation_id      TEXT NOT NULL,
+    attempt             INTEGER NOT NULL CHECK (attempt >= 1),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT workflow_leads_source_key UNIQUE (source_system, source_account, source_event_id),
+    CONSTRAINT workflow_leads_payload_object CHECK (jsonb_typeof(lead_data) = 'object')
+);
+
 CREATE TABLE IF NOT EXISTS notification_outbox (
     id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     idempotency_key     TEXT NOT NULL UNIQUE,
@@ -47,7 +65,7 @@ CREATE TABLE IF NOT EXISTS notification_outbox (
 );
 
 INSERT INTO workflow_schema_version (component, version)
-VALUES ('workflow_invoices', 1), ('notification_outbox', 1)
+VALUES ('workflow_invoices', 1), ('notification_outbox', 1), ('workflow_leads', 1)
 ON CONFLICT (component) DO UPDATE
 SET version = GREATEST(workflow_schema_version.version, EXCLUDED.version),
     installed_at = CASE

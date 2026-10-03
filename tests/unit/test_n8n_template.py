@@ -19,3 +19,18 @@ def test_demo_composes_every_module_instance_and_gates_non_success_states():
     assert workflow["settings"]["saveDataErrorExecution"] == "none"
     assert workflow["settings"]["saveDataSuccessExecution"] == "none"
     assert nodes["Stop for review"]["type"] == "n8n-nodes-base.stopAndError"
+
+
+def test_lead_management_template_is_private_synthetic_preview():
+    path = Path(__file__).resolve().parents[2] / "workflows" / "n8n" / "lead-management-local.demo.json"
+    workflow = json.loads(path.read_text(encoding="utf-8"))
+    http_nodes = [node for node in workflow["nodes"] if node["type"] == "n8n-nodes-base.httpRequest"]
+    assert len(http_nodes) == 1
+    request = http_nodes[0]["parameters"]
+    assert request["url"].endswith("/v1/workflow-instances/portfolio.lead_management_local/runs")
+    assert "synthetic-lead-001" in request["jsonBody"]
+    assert "taylor@example.invalid" in request["jsonBody"]
+    assert "DRY_RUN" in request["jsonBody"]
+    assert workflow["active"] is False
+    assert workflow["settings"]["saveDataErrorExecution"] == "none"
+    assert workflow["settings"]["saveDataSuccessExecution"] == "none"

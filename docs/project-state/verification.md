@@ -2,6 +2,16 @@
 
 ## Checks completed
 
+- Final focused suite after independent-audit fixes: `.venv\Scripts\python.exe -m pytest -q` returned **76 passed, 1 Starlette deprecation warning**; `compileall` and `git diff --check` passed.
+- Applied `infra/postgres/migrations/002-lead-management.sql` to the already-running Compose PostgreSQL volume. The repeatable migration created `workflow_leads` and recorded schema version 1.
+- Rebuilt/restarted the Docker API image at version 0.2.0 and exercised `POST /v1/workflow-instances/portfolio.lead_management_local/runs` with `MOCK` plus the local API bearer key, using synthetic-only records. Observed one new row (`STORED`), a repeated same event (`DUPLICATE`, no second row), and a changed payload with the same key (`PAYLOAD_CONFLICT_REVIEW`, first payload preserved). Each outcome ended in `REVIEW_REQUIRED`.
+- Submitted a synthetic malformed/incomplete lead. API output and stored row reported `REVIEW_REQUIRED` with exact reasons: missing name/service/description, invalid email shape, qualification rubric not configured. No values were fabricated.
+- Repeated the event after the final status change: workflow and store returned `REVIEW_REQUIRED` while retaining state `DUPLICATE`. Response payload omitted the synthetic email. Direct health checks returned `ok` for API and n8n; PostgreSQL was healthy.
+- Static tests confirm the lead n8n export targets the correct local workflow instance, uses synthetic `.invalid` data, remains inactive, defaults to `DRY_RUN`, and disables saved execution payloads.
+- Focused boundary tests now confirm direct module calls expose only qualification status/reasons (not lead identity) and that malformed/oversized qualification data or a forged fingerprint is rejected before the storage connection opens.
+- In the browser, the test Google Form response page showed 0 responses and that it must be published before accepting responses; the linked response Sheet exists. The form was not published.
+- Opening `http://127.0.0.1:5678` showed the n8n sign-in page. Workflow import/execution was not attempted without the owner's n8n login.
+
 - `.venv\Scripts\python.exe -m pytest -q`: **65 passed**, including definition/instance bindings, per-instance configuration, HTTP executor addressing/auth headers, email/PDF input, LLM/validation, storage/outbox, notification retry behavior, API auth/live-Gmail gate, and n8n workflow topology.
 - `.venv\Scripts\python.exe -m compileall -q src tests`: passed.
 - `uv sync --extra dev`: passed; resolved/audited 37 packages.
@@ -19,14 +29,18 @@
 
 ## Not checked / not implemented
 
-- No live Gmail, OpenAI, Slack, PostgreSQL, or client environment was available or exercised. The Gmail route is mocked; storage tests use a fake connection.
+- No live Gmail, Outlook, OpenAI, Slack, GHL/CRM, Google Forms/Sheets response ingestion, or client environment was exercised. Invoice workflow provider routes remain mocked; lead PostgreSQL was exercised with synthetic data.
 - Unauthenticated `DRY_RUN`/`REPLAY` avoids database writes and provider outputs, but does not impose a synthetic-data-only restriction on caller payloads or verify that replay inputs were captured and sanitized. Keep the API loopback/private, sanitize replay data before submission, and treat preview results as potentially sensitive.
 - `WORKFLOW_API_KEY` is a single shared bearer key, not per-user identity/authorization, role separation, or TLS. Compose host ports bind to loopback; a production deployment still needs its own access and transport controls.
 - n8n workflow import/execution, live Gmail/OpenAI/Slack, and credential-backed provider workflows are unverified. The database was exercised for sequential idempotency, but concurrent contention/race behavior was not tested.
+- Lead workflow n8n UI import/execution, Google Forms/Sheets trigger ingestion, email sending, GHL CRM, live OpenAI qualification, reply/book/opt-out/manual-pause suppression, and public HTTPS ingress are unverified or unavailable.
+- The local PostgreSQL integration covered sequential retries only, not simultaneous write races, load/capacity, connection pool saturation, or backup/restore.
+- No lead email was sent and no CRM account was written. Four synthetic event rows are retained locally; no real prospect data was used.
 - OCR, provider-call budget/cache, async queue/backpressure, connection pooling, automatic retry scheduler, retention/migration jobs, load/capacity tests, and production monitoring are outside this initial implementation.
 - Git is initialized on local `main`, with `origin` configured to the provided GitHub repository.
 
 ## Review status
 
-- Independent read-only audit completed against the adopted revised plan. Its remaining anonymous preview-payload risk is recorded above and in the README/module notes.
-- User review/acceptance of the portfolio workflow and remaining gaps is pending.
+- Independent read-only audit of the lead reference is recorded in `lead-management-audit.md`. It confirms the full Upwork brief is not delivered and records the available local integration evidence, account blockers, and remaining risks.
+- Two initial findings (intake review state exposure and unbounded storage qualification shape) were fixed; an independent source re-check confirmed those fixes. The 76-test run and final Docker integration are implementation-lead evidence, not independently rerun by the auditor.
+- User review/acceptance of the local reference and remaining gaps is pending.

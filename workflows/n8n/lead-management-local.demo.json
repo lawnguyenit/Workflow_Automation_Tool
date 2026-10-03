@@ -1,0 +1,42 @@
+{
+  "name": "Lead Management Intake (private local synthetic preview)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "936d70f2-9f06-4b4e-8a18-009e1cb5736a",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/v1/workflow-instances/portfolio.lead_management_local/runs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { payload: { lead: { source_system: 'manual_test', source_account: 'local_portfolio', source_event_id: 'synthetic-lead-001', name: 'Taylor Example', email: 'taylor@example.invalid', phone: '+15550102030', service_requested: 'Workflow automation', description: 'Synthetic lead for local preview only.' } }, context: { workflow_id: 'lead_management_intake', attempt: 1, mode: 'DRY_RUN' } } }}",
+        "options": {}
+      },
+      "id": "60ff9df5-ff9c-4c61-9ee4-51ca538b0242",
+      "name": "Preview lead intake",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{"node": "Preview lead intake", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none"
+  },
+  "versionId": "cb7f66c2-43ed-4d2a-a6c8-067a6d008347",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}

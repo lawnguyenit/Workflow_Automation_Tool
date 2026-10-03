@@ -72,3 +72,13 @@ Every result includes `module_id`, contract version, `SUCCESS` / `PARTIAL` / `FA
 - PostgreSQL documents `ON CONFLICT DO NOTHING` and the role of unique constraints under concurrent activity: [INSERT reference](https://www.postgresql.org/docs/current/sql-insert.html). This supports the design rationale, but does not replace a live database contention test.
 - The official PostgreSQL Docker image documents a version-specific `PGDATA` path and the PostgreSQL 18 volume-path change; Compose mounts the parent data directory accordingly: [official image definition](https://github.com/docker-library/postgres/blob/master/18/trixie/Dockerfile), [official image notes](https://github.com/docker-library/docs/blob/master/postgres/README.md).
 - n8n documents execution-history visibility/retry and queue mode for scaling; the checked-in demo disables saved execution data, while production retention and worker topology must be selected for the target installation: [execution history](https://docs.n8n.io/workflows/executions/all-executions/), [queue mode](https://docs.n8n.io/hosting/scaling/queue-mode/).
+
+## Lead-management modules (reference instance v1)
+
+See [lead-management-reference.md](lead-management-reference.md) for the full contract, current graph, guarantees, and limitations.
+
+- `lead.intake` normalizes bounded lead fields, flags missing/invalid values, and fails closed to `REVIEW_REQUIRED` because no owner-approved qualification rubric or live model exists.
+- `lead.store` persists one row per source event using a PostgreSQL unique constraint. It is first-write-wins and distinguishes an identical duplicate from the same event key carrying a changed payload.
+- The key is `(source_system, source_account, source_event_id)`. It prevents repeated intake rows for the same upstream event, but does not deduplicate contacts/opportunities in GHL or repeated messages.
+- The private Google Form draft remains unpublished, and the n8n local demo is preview-only by default. No CRM, LLM, or email side effect is bound to this graph.
+- Capacity, simultaneous contention, external-provider semantics, public ingress, and live form-to-database execution remain unverified. Use only synthetic data until the relevant accounts and data-handling decisions are established.
