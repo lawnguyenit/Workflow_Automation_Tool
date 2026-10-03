@@ -18,5 +18,6 @@ This folder tracks the supplied Upwork brief as a bounded portfolio exercise. It
 - [PIPELINE.yaml](PIPELINE.yaml): module reuse/adaptation, composition edges, stops, and success condition.
 - [TASKS.yaml](TASKS.yaml): bounded owner and workflow-lead work with gates and verification criteria.
 - [COSTS.md](COSTS.md): provider costs, quotas, customer-owned accounts, and the paid-test policy.
+- [STATUS-MAP.md](STATUS-MAP.md): visual pipeline state, module test evidence, client gates, cost notes, and the real-job debugging path.
 
 Do not mark a blocked edge complete based on a module unit test. Re-audit the full composed path after owner inputs and runtime evidence exist.
