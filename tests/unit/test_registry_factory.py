@@ -30,6 +30,16 @@ def test_ghl_instance_is_bound_only_when_location_is_configured(monkeypatch):
     assert instance.module == "crm.ghl_upsert_contact"
     assert instance.config == {"location_id": "synthetic-location"}
     assert "synthetic-token" not in str(instance.model_dump())
+    opportunity_instance = with_location.instances["portfolio.ghl_opportunity_upsert"]
+    assert opportunity_instance.module == "crm.ghl_upsert_opportunity"
+    assert opportunity_instance.config == {"location_id": "synthetic-location"}
+    assert "synthetic-token" not in str(opportunity_instance.model_dump())
+    opportunity = with_location.instance_modules[opportunity_instance.instance_id].execute(
+        {"opportunity": {"contactId": "contact-1", "pipelineId": "pipeline-1",
+                         "pipelineStageId": "stage-1", "name": "Synthetic", "status": "open"}},
+        ExecutionContext(workflow_id="ghl_test", mode=RunMode.DRY_RUN),
+    )
+    assert opportunity.business_result["state"] == "PREVIEWED"
     result = with_location.instance_modules[instance.instance_id].execute(
         {"contact": {"email": "ada@example.invalid"}},
         ExecutionContext(workflow_id="ghl_test", mode=RunMode.DRY_RUN),

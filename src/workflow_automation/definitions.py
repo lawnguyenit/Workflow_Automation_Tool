@@ -54,6 +54,10 @@ MODULE_DEFINITIONS = [
                      input_schema={"type": "object", "required": ["contact"]},
                      output_schema={"type": "object", "required": ["state", "contact_id", "new"]},
                      possible_results=["SUCCESS", "FAILURE", "REVIEW_REQUIRED"]),
+    ModuleDefinition(module_id="crm.ghl_upsert_opportunity", purpose="Create or update a GoHighLevel open opportunity for a contact and pipeline.",
+                     input_schema={"type": "object", "required": ["opportunity"]},
+                     output_schema={"type": "object", "required": ["state", "opportunity_id", "new"]},
+                     possible_results=["SUCCESS", "FAILURE", "REVIEW_REQUIRED"]),
 ]
 
 MODULE_IMPLEMENTATIONS = [
@@ -86,6 +90,12 @@ MODULE_IMPLEMENTATIONS = [
                          limitations=["Contact matching follows per-Location duplicate settings; this module does not promise exactly-once writes.",
                                       "Remote timeout/server-error outcomes require reconciliation before retry.",
                                       "Tags are intentionally excluded because upsert replaces the complete tag list."]),
+    ModuleImplementation(implementation_id="crm.ghl_upsert_opportunity.http.v1", implements="crm.ghl_upsert_opportunity",
+                         runtime="python", provider="GoHighLevel Opportunities API v3",
+                       limitations=["Matches at most one open opportunity by contact and pipeline; ambiguous matches require review.",
+                                      "REAL writes require migration 003 and a shared PostgreSQL advisory-lock/reconciliation guard across workers.",
+                                      "An IN_PROGRESS or uncertain provider effect blocks retries until an operator reconciles it.",
+                                      "The guard coordinates only this adapter's workers; other systems writing directly to HighLevel are outside its lock."]),
 ]
 
 MODULE_INSTANCES = [

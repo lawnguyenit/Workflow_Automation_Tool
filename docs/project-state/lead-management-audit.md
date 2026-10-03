@@ -1,5 +1,11 @@
 # Independent audit — local lead-management reference
 
+## Capability update — 0.5.0 in progress
+
+The 0.5.0 change adds a separately callable GHL opportunity adapter based on the official v3 search/create/update endpoints. Its proposed policy is open-match-only by exact Location/contact/pipeline: create on zero matches, update one, and hold multiple matches for review. An independent audit found that concurrent search-then-create calls could race. The implementation added a shared PostgreSQL advisory lock and durable pre-write claim/reconciliation row, then exercised simultaneous calls against local Docker PostgreSQL using synthetic HTTP transport. The race produced one create; a retry updated that record; an unknown provider result blocked another provider call. This does not close the original audit gap: there is still no GHL account, the adapter is not composed into the lead workflow, and no live write or end-to-end acceptance run exists.
+
+The current implementation also still lacks GHL contact tag operations, connected source ingestion, outbound email/follow-up suppression, lead-specific alert/recovery orchestration, a durable model-call ledger/budget, and n8n UI import/runtime evidence. Those requirements remain incomplete.
+
 ## Follow-up audit update — 2026-10-03
 
 The original audit below captured the pre-0.4.0 state and is retained as historical evidence. The independent re-review of 0.4.0 found the full Upwork brief remains incomplete, while confirming the newly composed `lead.intake → lead.qualify/review → lead.store` path is only locally verified with synthetic fixtures in `DRY_RUN`. The Docker API returned `CLASSIFIED` qualification and `PREVIEWED` storage with synthetic name/email/phone omitted from its aggregate response; this was re-run after the fixes below.
@@ -9,6 +15,12 @@ The original audit below captured the pre-0.4.0 state and is retained as histori
 - **Current verification:** 95 tests pass with one Starlette deprecation warning; `compileall`, `git diff --check`, and Docker API rebuild/preview pass.
 - **Still incomplete:** connected form/webhook, GHL opportunity/custom fields/tags, email sequence, reply/booking/opt-out/manual-pause suppression, lead-specific alert/recovery, n8n UI import/runtime, live provider checks, and end-to-end acceptance.
 - **Material risk:** REAL qualification retries can repeat model cost because no durable call ledger/cache/spend ceiling exists; prompt provenance does not yet bind a rubric version/hash.
+
+## Opportunity race remediation — 2026-10-03
+
+- **Finding addressed by implementation lead:** concurrent adapter instances could both observe zero opportunities. Migration 003 now supports a durable `IN_PROGRESS` claim before any provider request, and a PostgreSQL advisory lock serializes the exact Location/contact/pipeline effect key across application workers sharing the database.
+- **Verification evidence:** 110 unit tests pass. A synthetic concurrent integration against the local Docker PostgreSQL used mocked HighLevel HTTP responses: exactly one create occurred; a subsequent retry updated the existing synthetic record. A simulated 5xx left a pending reconciliation row and the next call made no provider request.
+- **Residual risk:** this remediation has not received a second independent audit after implementation. It only coordinates callers using the same guard/database. Direct HighLevel edits, other integrations, or old app versions remain outside the lock. General load, connection-pool, failover, backup/restore, and live HighLevel behavior remain unverified.
 
 ## Reviewed scope and authority
 
@@ -25,7 +37,7 @@ The original audit below captured the pre-0.4.0 state and is retained as histori
 | AUD-02 | Resolved / source-inspected | Direct intake no longer masks the human-review state. | Intake returns `PARTIAL`; API exposes qualification status/reasons only and suppresses identity fields. | Final unit suite has a focused API boundary test. |
 | AUD-03 | Resolved / source-inspected | Malformed qualification data can no longer fail after persistence. | `lead.store` validates exact record/fingerprint shape, JSON safety, reason count/text and optional qualification fields before opening the database connection. | Unit tests cover malformed qualification, oversized reason lists, and fingerprint mismatch. |
 | AUD-04 | Resolved / evidence index refreshed | Shared module catalog previously lacked both lead modules and had stale test totals. | Workspace `docs/MODULE_CATALOG.md` now includes the two entries and 76-test evidence. | Recheck index when implementation changes. |
-| AUD-05 | Risk / deliberately bounded | Dedupe is source-event scoped only. | Unique key `(source_system, source_account, source_event_id)`; sequential PostgreSQL test confirms duplicate and changed-payload behavior. | No CRM contact/opportunity or outbound message dedupe. No actual external webhook retry or concurrent race test. |
+| AUD-05 | Risk / deliberately bounded | Lead storage dedupe is source-event scoped; CRM effects have separate matching policy. | Unique key `(source_system, source_account, source_event_id)`; sequential PostgreSQL tests plus same-key GHL adapter race check using synthetic transport. | No outbound message dedupe or cross-system exactly-once guarantee; direct CRM writers are outside the adapter guard. |
 
 ## Criterion matrix
 
@@ -46,5 +58,5 @@ The original audit below captured the pre-0.4.0 state and is retained as histori
 
 - Full Upwork scope remains incomplete by design/account availability; user account and business inputs determine the next binding work.
 - Verified behavior: 76 unit tests, compile checks, repeatable migration, local Docker API/PostgreSQL integration for stored/duplicate/conflict/missing-field review, and API output redaction.
-- Not verified: n8n UI execution, connected form ingestion, email, GHL, OpenAI, follow-up suppression, concurrent database behavior, or client acceptance.
+- Not verified: n8n UI execution, connected form ingestion, email, live GHL, OpenAI, follow-up suppression, general database capacity/failover, or client acceptance. Same-key guarded GHL concurrency was checked separately with synthetic provider responses.
 - No email was sent and no CRM account was modified. Four synthetic rows remain in the local database.

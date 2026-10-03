@@ -10,7 +10,7 @@ def test_catalog_and_health_are_available():
     assert {module["module_id"] for module in catalog["modules"]} == {
         "email.ingest", "document.extract", "llm.structured_extract", "data.validate",
         "storage.record", "notify.send", "lead.intake", "lead.store",
-        "lead.qualify", "crm.ghl_upsert_contact",
+        "lead.qualify", "crm.ghl_upsert_contact", "crm.ghl_upsert_opportunity",
     }
 
 
@@ -29,6 +29,18 @@ def test_ghl_module_endpoint_is_exposed_without_leaking_runtime_token(monkeypatc
     })
     assert response.status_code == 200
     assert response.json()["business_result"] == {"state": "PREVIEWED", "side_effect": False}
+
+    module_instance = next(item for item in catalog["instances"]
+                           if item["instance_id"] == "portfolio.ghl_opportunity_upsert")
+    assert module_instance["config"] == {"location_id": "synthetic-location"}
+    opportunity_response = client.post("/v1/instances/portfolio.ghl_opportunity_upsert/runs", json={
+        "payload": {"opportunity": {
+            "contactId": "synthetic-contact", "pipelineId": "synthetic-pipeline",
+            "pipelineStageId": "synthetic-stage", "name": "Synthetic opportunity", "status": "open",
+        }},
+    })
+    assert opportunity_response.status_code == 200
+    assert opportunity_response.json()["business_result"] == {"state": "PREVIEWED", "side_effect": False}
 
 
 def test_portfolio_runs_end_to_end_in_dry_run_without_external_services():

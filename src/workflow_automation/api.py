@@ -65,7 +65,7 @@ class WorkflowRunRequest(BaseModel):
 def create_app() -> FastAPI:
     registry = build_registry()
     runner = WorkflowRunner(registry)
-    app = FastAPI(title="Workflow Automation Module API", version="0.4.0")
+    app = FastAPI(title="Workflow Automation Module API", version="0.5.0")
     app.state.registry = registry
     app.state.runner = runner
 

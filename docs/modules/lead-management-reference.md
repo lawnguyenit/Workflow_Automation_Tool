@@ -15,7 +15,7 @@ local webhook payload
 
 The current portfolio path does not call a live LLM, create a CRM contact/opportunity, or send a message. No qualification rubric, GHL test Location, or OpenAI API key is available. It therefore preserves the request and marks it for human review rather than guessing a sales class or summary. A synthetic rubric/fixture can exercise the classification composition without a paid provider call.
 
-The reusable `crm.ghl_upsert_contact` adapter is now implemented separately and synthetic-test verified. It is not bound to this portfolio workflow because the account, Location, duplicate policy, and field mapping are not configured. See [GHL contact upsert](ghl-contact-upsert.md).
+The reusable `crm.ghl_upsert_contact` and `crm.ghl_upsert_opportunity` adapters are implemented separately and synthetic-test verified. They are not composed into this portfolio workflow because the GHL account, Location, contact duplicate policy, pipeline/stage IDs, and field mapping are not configured. See [GHL contact upsert](ghl-contact-upsert.md) and [GHL opportunity upsert](ghl-opportunity-upsert.md).
 
 ## Guarantees and failure behavior
 

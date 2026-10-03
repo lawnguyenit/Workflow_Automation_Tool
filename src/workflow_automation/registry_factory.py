@@ -13,8 +13,10 @@ from workflow_automation.definitions import (
     PORTFOLIO_WORKFLOW_INSTANCE,
 )
 from workflow_automation.executors import PythonExecutor
+from workflow_automation.infrastructure.postgres_effect_guard import PostgresExternalEffectGuard
 from workflow_automation.models import ModuleInstance
 from workflow_automation.modules.crm.ghl_upsert_contact import GHLUpsertContact
+from workflow_automation.modules.crm.ghl_upsert_opportunity import GHLUpsertOpportunity
 from workflow_automation.modules.input.email_ingest import EmailIngest
 from workflow_automation.modules.output.notify import NotifySend
 from workflow_automation.modules.processing.lead_intake import LeadIntake
@@ -46,6 +48,15 @@ def build_registry(additional_module_instances=None) -> FrameworkRegistry:
             instance_id="portfolio.ghl_contact_upsert",
             module="crm.ghl_upsert_contact",
             implementation="crm.ghl_upsert_contact.http.v1",
+            executor_id="python.local",
+            config={"location_id": ghl_location_id},
+        ))
+    if ghl_location_id and not any(item.instance_id == "portfolio.ghl_opportunity_upsert"
+                                   for item in instance_catalog):
+        instance_catalog.append(ModuleInstance(
+            instance_id="portfolio.ghl_opportunity_upsert",
+            module="crm.ghl_upsert_opportunity",
+            implementation="crm.ghl_upsert_opportunity.http.v1",
             executor_id="python.local",
             config={"location_id": ghl_location_id},
         ))
@@ -101,6 +112,12 @@ def build_registry(additional_module_instances=None) -> FrameworkRegistry:
             module = GHLUpsertContact(
                 location_id=config.get("location_id", ""),
                 timeout_seconds=config.get("timeout_seconds", 15),
+            )
+        elif item.module == "crm.ghl_upsert_opportunity":
+            module = GHLUpsertOpportunity(
+                location_id=config.get("location_id", ""),
+                timeout_seconds=config.get("timeout_seconds", 15),
+                effect_guard=PostgresExternalEffectGuard(),
             )
         else:
             raise ValueError(f"No module factory is registered for capability {item.module}")
