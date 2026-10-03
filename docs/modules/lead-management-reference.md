@@ -13,6 +13,8 @@ local webhook payload
 
 The normal path deliberately does not call a live LLM, create a CRM contact/opportunity, or send a message. No qualification rubric, GHL test Location, or OpenAI API key is available. The workflow therefore preserves the request and marks it for human review rather than guessing a sales class or summary.
 
+The reusable `crm.ghl_upsert_contact` adapter is now implemented separately and synthetic-test verified. It is not bound to this portfolio workflow because the account, Location, duplicate policy, and field mapping are not configured. See [GHL contact upsert](ghl-contact-upsert.md).
+
 ## Guarantees and failure behavior
 
 - A source event is keyed by `(source_system, source_account, source_event_id)` with a PostgreSQL unique constraint. Concurrent retries contend on the database constraint, so only one row is created for that exact source event key.

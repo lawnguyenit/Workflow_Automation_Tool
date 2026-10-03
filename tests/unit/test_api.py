@@ -11,6 +11,7 @@ def test_catalog_and_health_are_available():
     assert {module["module_id"] for module in catalog["modules"]} == {
         "email.ingest", "document.extract", "llm.structured_extract", "data.validate",
         "storage.record", "notify.send", "lead.intake", "lead.store",
+        "crm.ghl_upsert_contact",
     }
 
 

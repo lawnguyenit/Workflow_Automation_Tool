@@ -46,6 +46,10 @@ MODULE_DEFINITIONS = [
                      input_schema={"type": "object", "required": ["lead"]},
                      output_schema={"type": "object", "required": ["state", "duplicate"]},
                      possible_results=["SUCCESS", "PARTIAL", "FAILURE", "REVIEW_REQUIRED"]),
+    ModuleDefinition(module_id="crm.ghl_upsert_contact", purpose="Create or update one GoHighLevel contact using its Location duplicate policy.",
+                     input_schema={"type": "object", "required": ["contact"]},
+                     output_schema={"type": "object", "required": ["state", "contact_id", "new"]},
+                     possible_results=["SUCCESS", "FAILURE", "REVIEW_REQUIRED"]),
 ]
 
 MODULE_IMPLEMENTATIONS = [
@@ -70,6 +74,11 @@ MODULE_IMPLEMENTATIONS = [
     ModuleImplementation(implementation_id="lead.store.postgres.v1", implements="lead.store", runtime="python",
                          provider="PostgreSQL",
                          limitations=["Dedupe scope is source event only; this is not CRM contact or outbound message deduplication."]),
+    ModuleImplementation(implementation_id="crm.ghl_upsert_contact.http.v1", implements="crm.ghl_upsert_contact",
+                         runtime="python", provider="GoHighLevel API v3",
+                         limitations=["Contact matching follows per-Location duplicate settings; this module does not promise exactly-once writes.",
+                                      "Remote timeout/server-error outcomes require reconciliation before retry.",
+                                      "Tags are intentionally excluded because upsert replaces the complete tag list."]),
 ]
 
 MODULE_INSTANCES = [

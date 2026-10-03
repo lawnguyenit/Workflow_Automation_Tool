@@ -2,6 +2,8 @@
 
 ## Checks completed
 
+- GHL contact upsert adapter added after review of official HighLevel v3 upsert, private integration, tag, and rate-limit docs. Its dedicated suite returned **8 passed**; the full repository suite returned **84 passed, 1 Starlette deprecation warning**. `compileall` and `git diff --check` passed. Synthetic transport tests only; no live GHL request or CRM side effect was made.
+
 - Final focused suite after independent-audit fixes: `.venv\Scripts\python.exe -m pytest -q` returned **76 passed, 1 Starlette deprecation warning**; `compileall` and `git diff --check` passed.
 - Applied `infra/postgres/migrations/002-lead-management.sql` to the already-running Compose PostgreSQL volume. The repeatable migration created `workflow_leads` and recorded schema version 1.
 - Rebuilt/restarted the Docker API image at version 0.2.0 and exercised `POST /v1/workflow-instances/portfolio.lead_management_local/runs` with `MOCK` plus the local API bearer key, using synthetic-only records. Observed one new row (`STORED`), a repeated same event (`DUPLICATE`, no second row), and a changed payload with the same key (`PAYLOAD_CONFLICT_REVIEW`, first payload preserved). Each outcome ended in `REVIEW_REQUIRED`.

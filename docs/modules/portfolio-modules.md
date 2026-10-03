@@ -79,6 +79,7 @@ See [lead-management-reference.md](lead-management-reference.md) for the full co
 
 - `lead.intake` normalizes bounded lead fields, flags missing/invalid values, and fails closed to `REVIEW_REQUIRED` because no owner-approved qualification rubric or live model exists.
 - `lead.store` persists one row per source event using a PostgreSQL unique constraint. It is first-write-wins and distinguishes an identical duplicate from the same event key carrying a changed payload.
+- `crm.ghl_upsert_contact` is a separate reusable GoHighLevel API v3 adapter. It uses Location duplicate rules, excludes tags to avoid replacing the full tag list, suppresses contact PII in results, and reports ambiguous writes for reconciliation. It has synthetic HTTP tests only; no live account is configured. See `docs/modules/ghl-contact-upsert.md`.
 - The key is `(source_system, source_account, source_event_id)`. It prevents repeated intake rows for the same upstream event, but does not deduplicate contacts/opportunities in GHL or repeated messages.
 - The private Google Form draft remains unpublished, and the n8n local demo is preview-only by default. No CRM, LLM, or email side effect is bound to this graph.
 - Capacity, simultaneous contention, external-provider semantics, public ingress, and live form-to-database execution remain unverified. Use only synthetic data until the relevant accounts and data-handling decisions are established.
