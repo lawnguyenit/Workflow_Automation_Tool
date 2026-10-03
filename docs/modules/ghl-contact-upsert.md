@@ -10,7 +10,7 @@ Status: implemented and verified with synthetic HTTP transport tests; not verifi
 - For this module-backed API implementation, the provider token is read from `GHL_PRIVATE_INTEGRATION_TOKEN` in the API runtime environment. Do not commit it or put it into workflow exports/n8n HTTP node data. `REAL` requires a token; `MOCK`, `DRY_RUN`, and `REPLAY` make no network calls. If a workflow calls GHL directly with n8n's native node, use n8n's credential store instead.
 - When `GHL_LOCATION_ID` is set at API startup, the runtime binds `portfolio.ghl_contact_upsert` so n8n can call `/v1/instances/portfolio.ghl_contact_upsert/runs`. Without a Location ID, no live-configured instance is listed. The Location ID is account configuration, not a secret; the token remains in the API runtime secret environment.
 - `Version: v3` and a fixed HTTPS provider endpoint are used. No caller-supplied URL is accepted.
-- Contact fields are allow-listed. `tags` is rejected because the provider documents that upsert replaces all existing tags; implement tagging as a separate add/remove operation after target tag behavior is agreed.
+- Contact fields are allow-listed. `tags` is rejected because upsert can replace the full tag list. A separate additive-only `crm.ghl_contact_tags` module now calls the documented Add Tags endpoint; it does not infer tags or remove existing ones.
 
 ## Safety and operational behavior
 

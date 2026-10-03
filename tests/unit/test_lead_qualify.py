@@ -3,6 +3,7 @@ import json
 import httpx
 
 from workflow_automation.contracts import ExecutionContext, RunMode
+from workflow_automation.infrastructure.postgres_lead_qualification_ledger import QualificationInputConflict
 from workflow_automation.modules.processing.lead_qualify import LeadQualify
 
 
@@ -24,6 +25,27 @@ _LEAD = {
 }
 _OUTPUT = {"classification": "qualified", "summary": "Wants to route web enquiries.", "confidence": 0.91,
            "missing_information": [], "reasons": []}
+
+
+class MemoryQualificationLedger:
+    def __init__(self):
+        self.calls = {}
+        self.provider_calls = 0
+
+    def run_once(self, *, event_key, input_fingerprint, criteria_fingerprint, provider_model,
+                 prompt_version, max_calls_per_day, operation):
+        identity = (input_fingerprint, criteria_fingerprint, provider_model, prompt_version)
+        if event_key in self.calls:
+            old_identity, result = self.calls[event_key]
+            if old_identity != identity:
+                raise QualificationInputConflict("synthetic source event conflict")
+            return result
+        if self.provider_calls >= max_calls_per_day:
+            raise AssertionError("test ledger cap unexpectedly exhausted")
+        self.provider_calls += 1
+        result = operation()
+        self.calls[event_key] = (identity, result)
+        return result
 
 
 def _context(mode=RunMode.MOCK):
@@ -92,7 +114,9 @@ def test_real_request_uses_strict_schema_and_excludes_direct_contact_fields():
         return httpx.Response(200, json={"output_text": json.dumps(_OUTPUT)})
 
     client = httpx.Client(transport=httpx.MockTransport(handler))
-    module = LeadQualify(api_key="test-token", model="test-model", http_client=client)
+    ledger = MemoryQualificationLedger()
+    module = LeadQualify(api_key="test-token", model="test-model", qualification_ledger=ledger,
+                         max_calls_per_day=3, http_client=client)
     try:
         result = module.execute({"lead": _LEAD, "criteria": _CRITERIA}, _context(RunMode.REAL))
     finally:
@@ -106,6 +130,52 @@ def test_real_request_uses_strict_schema_and_excludes_direct_contact_fields():
     assert "ada@example.invalid" not in prompt_data
     assert "Ada Example" not in prompt_data
     assert result.business_result["lead"]["qualification"]["model_used"] == "test-model"
+    assert ledger.provider_calls == 1
+
+
+def test_real_qualification_reuses_cached_result_and_rejects_changed_event_content():
+    calls = []
+
+    def handler(_request):
+        calls.append(True)
+        return httpx.Response(200, json={"output_text": json.dumps(_OUTPUT)})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    ledger = MemoryQualificationLedger()
+    module = LeadQualify(api_key="test-token", model="test-model", qualification_ledger=ledger,
+                         max_calls_per_day=3, http_client=client)
+    try:
+        first = module.execute({"lead": _LEAD, "criteria": _CRITERIA}, _context(RunMode.REAL))
+        retry = module.execute({"lead": _LEAD, "criteria": _CRITERIA}, _context(RunMode.REAL))
+        changed = module.execute({"lead": {**_LEAD, "description": "changed request"},
+                                  "criteria": _CRITERIA}, _context(RunMode.REAL))
+    finally:
+        client.close()
+    assert first.business_result["lead"]["qualification"] == retry.business_result["lead"]["qualification"]
+    assert calls == [True]
+    assert changed.business_result["lead"]["qualification"]["status"] == "REVIEW_REQUIRED"
+    assert changed.errors[0].code == "QUALIFICATION_INPUT_CONFLICT"
+
+
+def test_real_mode_fails_closed_without_persistent_ledger_or_explicit_daily_cap():
+    calls = []
+
+    def handler(_request):
+        calls.append(True)
+        return httpx.Response(200, json={"output_text": json.dumps(_OUTPUT)})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    try:
+        no_ledger = LeadQualify(api_key="test-token", model="test-model", http_client=client)
+        no_limit = LeadQualify(api_key="test-token", model="test-model",
+                               qualification_ledger=MemoryQualificationLedger(), http_client=client)
+        first = no_ledger.execute({"lead": _LEAD, "criteria": _CRITERIA}, _context(RunMode.REAL))
+        second = no_limit.execute({"lead": _LEAD, "criteria": _CRITERIA}, _context(RunMode.REAL))
+    finally:
+        client.close()
+    assert first.errors[0].code == "qualification_ledger_or_daily_limit_not_configured"
+    assert second.errors[0].code == "qualification_ledger_or_daily_limit_not_configured"
+    assert calls == []
 
 
 def test_model_timeout_is_sanitized_and_not_automatically_retried():
@@ -116,7 +186,9 @@ def test_model_timeout_is_sanitized_and_not_automatically_retried():
         raise httpx.ReadTimeout("untrusted transport details")
 
     client = httpx.Client(transport=httpx.MockTransport(handler))
-    module = LeadQualify(api_key="test-token", model="test-model", http_client=client)
+    module = LeadQualify(api_key="test-token", model="test-model",
+                         qualification_ledger=MemoryQualificationLedger(), max_calls_per_day=3,
+                         http_client=client)
     try:
         result = module.execute({"lead": _LEAD, "criteria": _CRITERIA}, _context(RunMode.REAL))
     finally:

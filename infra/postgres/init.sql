@@ -46,6 +46,35 @@ CREATE TABLE IF NOT EXISTS workflow_leads (
     CONSTRAINT workflow_leads_payload_object CHECK (jsonb_typeof(lead_data) = 'object')
 );
 
+CREATE TABLE IF NOT EXISTS workflow_lead_qualification_calls (
+    event_key               CHAR(64) PRIMARY KEY CHECK (event_key ~ '^[a-f0-9]{64}$'),
+    input_fingerprint       CHAR(64) NOT NULL CHECK (input_fingerprint ~ '^[a-f0-9]{64}$'),
+    criteria_fingerprint    CHAR(64) NOT NULL CHECK (criteria_fingerprint ~ '^[a-f0-9]{64}$'),
+    provider_model          TEXT NOT NULL CHECK (length(provider_model) BETWEEN 1 AND 200),
+    prompt_version          TEXT NOT NULL CHECK (length(prompt_version) BETWEEN 1 AND 100),
+    state                   TEXT NOT NULL CHECK (state IN ('IN_PROGRESS', 'COMPLETED', 'UNKNOWN')),
+    result                  JSONB,
+    error_code              TEXT CHECK (error_code IS NULL OR length(error_code) BETWEEN 1 AND 100),
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT workflow_lead_qualification_result_state CHECK (
+        (state = 'COMPLETED' AND jsonb_typeof(result) = 'object' AND error_code IS NULL)
+        OR (state <> 'COMPLETED' AND result IS NULL)
+    )
+);
+
+CREATE TABLE IF NOT EXISTS workflow_lead_qualification_daily_budget (
+    call_day_utc       DATE NOT NULL,
+    model_key          CHAR(64) NOT NULL CHECK (model_key ~ '^[a-f0-9]{64}$'),
+    attempted_calls    INTEGER NOT NULL CHECK (attempted_calls >= 0),
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (call_day_utc, model_key)
+);
+
+CREATE INDEX IF NOT EXISTS workflow_lead_qualification_unknown
+    ON workflow_lead_qualification_calls (created_at)
+    WHERE state IN ('IN_PROGRESS', 'UNKNOWN');
+
 CREATE TABLE IF NOT EXISTS notification_outbox (
     id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     idempotency_key     TEXT NOT NULL UNIQUE,
@@ -65,7 +94,8 @@ CREATE TABLE IF NOT EXISTS notification_outbox (
 );
 
 INSERT INTO workflow_schema_version (component, version)
-VALUES ('workflow_invoices', 1), ('notification_outbox', 1), ('workflow_leads', 1)
+VALUES ('workflow_invoices', 1), ('notification_outbox', 1), ('workflow_leads', 1),
+       ('workflow_lead_qualification_ledger', 1)
 ON CONFLICT (component) DO UPDATE
 SET version = GREATEST(workflow_schema_version.version, EXCLUDED.version),
     installed_at = CASE

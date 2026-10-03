@@ -18,9 +18,11 @@ from workflow_automation.definitions import (
 )
 from workflow_automation.executors import PythonExecutor
 from workflow_automation.infrastructure.postgres_effect_guard import PostgresExternalEffectGuard
+from workflow_automation.infrastructure.postgres_lead_qualification_ledger import PostgresLeadQualificationLedger
 from workflow_automation.models import ModuleInstance
 from workflow_automation.modules.crm.ghl_upsert_contact import GHLUpsertContact
 from workflow_automation.modules.crm.ghl_upsert_opportunity import GHLUpsertOpportunity
+from workflow_automation.modules.crm.ghl_contact_tags import GHLContactTags
 from workflow_automation.modules.input.email_ingest import EmailIngest
 from workflow_automation.modules.input.google_form_response import GoogleFormResponseRow
 from workflow_automation.modules.input.google_forms_api_response import GoogleFormsApiResponse
@@ -67,7 +69,18 @@ def build_registry(additional_module_instances=None) -> FrameworkRegistry:
             executor_id="python.local",
             config={"location_id": ghl_location_id},
         ))
+    if ghl_location_id and not any(item.instance_id == "portfolio.ghl_contact_tags"
+                                   for item in instance_catalog):
+        instance_catalog.append(ModuleInstance(
+            instance_id="portfolio.ghl_contact_tags",
+            module="crm.ghl_contact_tags",
+            implementation="crm.ghl_contact_tags.http.v1",
+            executor_id="python.local",
+            config={"location_id": ghl_location_id},
+        ))
     stores: dict[str, PostgresStore] = {}
+    qualification_call_limit = os.getenv("LEAD_LLM_MAX_CALLS_PER_DAY", "").strip()
+    max_qualification_calls_per_day = int(qualification_call_limit) if qualification_call_limit else None
     for item in instance_catalog:
         registry.add_instance(item)
         config = item.config
@@ -134,6 +147,8 @@ def build_registry(additional_module_instances=None) -> FrameworkRegistry:
                 minimum_confidence=config.get("minimum_confidence", 0.75),
                 timeout_seconds=config.get("timeout_seconds", 30),
                 max_input_chars=config.get("max_input_chars", 8_000),
+                qualification_ledger=PostgresLeadQualificationLedger(),
+                max_calls_per_day=max_qualification_calls_per_day,
             )
         elif item.module == "lead.store":
             module = PostgresLeadStore()
@@ -144,6 +159,12 @@ def build_registry(additional_module_instances=None) -> FrameworkRegistry:
             )
         elif item.module == "crm.ghl_upsert_opportunity":
             module = GHLUpsertOpportunity(
+                location_id=config.get("location_id", ""),
+                timeout_seconds=config.get("timeout_seconds", 15),
+                effect_guard=PostgresExternalEffectGuard(),
+            )
+        elif item.module == "crm.ghl_contact_tags":
+            module = GHLContactTags(
                 location_id=config.get("location_id", ""),
                 timeout_seconds=config.get("timeout_seconds", 15),
                 effect_guard=PostgresExternalEffectGuard(),

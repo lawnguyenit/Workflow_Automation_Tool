@@ -70,6 +70,10 @@ MODULE_DEFINITIONS = [
                      input_schema={"type": "object", "required": ["opportunity"]},
                      output_schema={"type": "object", "required": ["state", "opportunity_id", "new"]},
                      possible_results=["SUCCESS", "FAILURE", "REVIEW_REQUIRED"]),
+    ModuleDefinition(module_id="crm.ghl_contact_tags", purpose="Add tags to an existing HighLevel contact without replacing its current tag list.",
+                     input_schema={"type": "object", "required": ["contact_id", "tags"]},
+                     output_schema={"type": "object", "required": ["state", "side_effect"]},
+                     possible_results=["SUCCESS", "FAILURE", "REVIEW_REQUIRED"]),
 ]
 
 MODULE_IMPLEMENTATIONS = [
@@ -108,7 +112,9 @@ MODULE_IMPLEMENTATIONS = [
                          limitations=["No qualification rubric or live LLM is configured; all leads remain for human review."]),
     ModuleImplementation(implementation_id="lead.qualify.openai.v1", implements="lead.qualify", runtime="python",
                          provider="OpenAI Responses API or explicit synthetic/replay fixture",
-                         limitations=["No rubric or API credential is configured in the portfolio instance; real model quality and cost are unverified."]),
+                         limitations=["REAL mode requires the durable PostgreSQL qualification ledger and an explicit daily request cap.",
+                                      "The daily cap limits request count, not monetary spend; model prices/token usage are not used to enforce USD budgets.",
+                                      "No rubric or API credential is configured in the portfolio instance; live model quality and cost remain unverified."]),
     ModuleImplementation(implementation_id="lead.store.postgres.v1", implements="lead.store", runtime="python",
                          provider="PostgreSQL",
                          limitations=["Dedupe scope is source event only; this is not CRM contact or outbound message deduplication."]),
@@ -123,6 +129,11 @@ MODULE_IMPLEMENTATIONS = [
                                       "REAL writes require migration 003 and a shared PostgreSQL advisory-lock/reconciliation guard across workers.",
                                       "An IN_PROGRESS or uncertain provider effect blocks retries until an operator reconciles it.",
                                       "The guard coordinates only this adapter's workers; other systems writing directly to HighLevel are outside its lock."]),
+    ModuleImplementation(implementation_id="crm.ghl_contact_tags.http.v1", implements="crm.ghl_contact_tags",
+                         runtime="python", provider="GoHighLevel Contacts API v3",
+                         limitations=["Adds tags only; it does not remove tags or infer labels from qualification.",
+                                      "REAL writes require contacts.write and the shared PostgreSQL effect guard.",
+                                      "Unknown outcomes require contact inspection and reconciliation before retry."]),
 ]
 
 MODULE_INSTANCES = [

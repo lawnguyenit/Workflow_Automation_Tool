@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 from datetime import UTC, datetime
@@ -15,6 +16,14 @@ from workflow_automation.contracts import (
     ResultState,
     Retryability,
     RunMode,
+)
+from workflow_automation.infrastructure.postgres_lead_qualification_ledger import (
+    QualificationBudgetExhausted,
+    QualificationInProgress,
+    QualificationInputConflict,
+    QualificationLedgerError,
+    QualificationLedgerUnavailable,
+    QualificationReconciliationRequired,
 )
 
 
@@ -48,6 +57,8 @@ class LeadQualify:
         minimum_confidence: float = 0.75,
         timeout_seconds: float = 30.0,
         max_input_chars: int = 8_000,
+        qualification_ledger: Any | None = None,
+        max_calls_per_day: int | None = None,
         http_client: httpx.Client | None = None,
     ) -> None:
         self._api_key = api_key if api_key is not None else os.getenv("OPENAI_API_KEY")
@@ -56,6 +67,8 @@ class LeadQualify:
         self._minimum_confidence = minimum_confidence
         self._timeout_seconds = timeout_seconds
         self._max_input_chars = max_input_chars
+        self._qualification_ledger = qualification_ledger
+        self._max_calls_per_day = max_calls_per_day
         self._http_client = http_client
 
     def execute(self, payload: dict[str, Any], context: ExecutionContext) -> ModuleResult:
@@ -86,7 +99,30 @@ class LeadQualify:
             if context.mode == RunMode.REAL:
                 if not self._api_key or not self._model:
                     return self._hold(lead, context, started, "llm_provider_not_configured")
-                output = self._request(criteria, service, description)
+                if self._qualification_ledger is None or self._max_calls_per_day is None:
+                    return self._hold(lead, context, started, "qualification_ledger_or_daily_limit_not_configured")
+                source_identity = [lead.get(field) for field in
+                                   ("source_system", "source_account", "source_event_id")]
+                if any(not isinstance(value, str) or not value.strip() for value in source_identity):
+                    return self._hold(lead, context, started, "stable_source_identity_required_for_real_qualification")
+                event_key = self._digest(source_identity)
+                input_fingerprint = self._digest([service, description])
+                criteria_fingerprint = self._digest(criteria)
+
+                def call_and_minimize() -> dict[str, Any]:
+                    result = self._request(criteria, service, description)
+                    result["summary"] = self._sanitize_summary(result["summary"], lead)
+                    return result
+
+                output = self._qualification_ledger.run_once(
+                    event_key=event_key,
+                    input_fingerprint=input_fingerprint,
+                    criteria_fingerprint=criteria_fingerprint,
+                    provider_model=self._model,
+                    prompt_version=_PROMPT_VERSION,
+                    max_calls_per_day=self._max_calls_per_day,
+                    operation=call_and_minimize,
+                )
                 provider = "openai"
                 model = self._model
             elif context.mode in (RunMode.MOCK, RunMode.DRY_RUN):
@@ -105,6 +141,15 @@ class LeadQualify:
                 model = "fixture"
             else:
                 return self._failure(context, started, "UNSUPPORTED_MODE", "Unsupported execution mode")
+        except QualificationLedgerError as exc:
+            if isinstance(exc, QualificationLedgerUnavailable):
+                retryability = (Retryability.UNKNOWN if exc.external_call_started
+                                else Retryability.RETRYABLE)
+            elif isinstance(exc, QualificationInProgress):
+                retryability = Retryability.RETRYABLE
+            else:
+                retryability = Retryability.NOT_RETRYABLE
+            return self._hold(lead, context, started, exc.code, retryability=retryability)
         except _QualificationIssue as exc:
             return self._hold(lead, context, started, exc.code, retryability=exc.retryability)
 
@@ -262,6 +307,11 @@ class LeadQualify:
     @staticmethod
     def _present(value: Any) -> bool:
         return isinstance(value, str) and bool(value.strip())
+
+    @staticmethod
+    def _digest(value: Any) -> str:
+        serialized = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
     @staticmethod
     def _sanitize_summary(summary: str | None, lead: dict[str, Any]) -> str | None:

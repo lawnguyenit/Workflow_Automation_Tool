@@ -1,4 +1,16 @@
-## Current release 0.8.0 — Google Forms API read-only source
+## Current release 0.9.0 — Qualification ledger and GHL contact tags
+
+- REAL `lead.qualify` uses `PostgresLeadQualificationLedger`; it requires migration 004, stable source identity, PostgreSQL, and explicit `LEAD_LLM_MAX_CALLS_PER_DAY`. Missing configuration fails closed before provider calls. Identical completed requests reuse a cached contact-redacted result; changed inputs and uncertain prior calls require reconciliation.
+- `crm.ghl_contact_tags` is present in `/v1/catalog` as an additive HighLevel API v3 adapter. REAL writes use the shared PostgreSQL external-effect guard to serialize same-contact callers and hold unknown outcomes. It does not remove or replace tags and does not claim provider idempotency for a later repeat after a confirmed success.
+- `uv run pytest -q`: **159 passed, 1 existing Starlette deprecation warning**. `uv lock --check`, `python -m compileall -q src tests`, and `git diff --check` passed.
+- Synthetic Compose/PostgreSQL qualification integration verified same-event cache replay without a second callback, changed-payload hold, unknown-result reconciliation hold, one callback under an overlapping claim, and UTC-day cap rejection. Rows were removed by the script.
+- Synthetic Compose/PostgreSQL GHL tag integration used `httpx.MockTransport`, not HighLevel. Two overlapping same-contact calls made one provider request; a simulated timeout returned `REMOTE_OUTCOME_UNKNOWN` and blocked retry for reconciliation. Test reconciliation rows were removed by the script.
+- Both integration scripts ran in the rebuilt Compose API container. `GET /healthz` returned `{"status":"ok"}`; OpenAPI reports `0.9.0`; catalog includes `crm.ghl_contact_tags`. Docker API was rebuilt from the current source. n8n and PostgreSQL remained running.
+- No OpenAI, Google Forms, or HighLevel live request was made. No owner rubric, GHL Location/token/tag policy, or model request cap is configured, so these live modules are not ready for a real lead. The call cap is a request count, not USD spend; live model use also needs an account-side budget. No live provider quality, cost, retention, or account behavior has been verified.
+
+---
+
+## Release 0.8.0 — Google Forms API read-only source (history)
 
 - Implemented a pure `source.google_forms_api_response` adapter, registered the `portfolio.lead_management_google_forms_api` composition, an inactive five-minute n8n polling export, and a separate synthetic manual preview. Mapping uses exact Form question titles/question IDs and `<formId>:<responseId>` event identity.
 - OAuth design is limited to `forms.body.readonly` for schema and `forms.responses.readonly` for response listing. No OAuth was granted, no Forms API call was made, and the Form remains unpublished with no submitted response. The n8n workflows were not imported or activated.
