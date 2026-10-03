@@ -10,7 +10,8 @@ def test_catalog_and_health_are_available():
     assert {module["module_id"] for module in catalog["modules"]} == {
         "email.ingest", "document.extract", "llm.structured_extract", "data.validate",
         "storage.record", "notify.send", "gmail.send", "lead.intake", "lead.store",
-        "lead.qualify", "source.google_form_response", "crm.ghl_upsert_contact",
+        "lead.qualify", "source.google_form_response", "source.google_forms_api_response",
+        "crm.ghl_upsert_contact",
         "crm.ghl_upsert_opportunity",
     }
 
@@ -78,6 +79,41 @@ def test_google_form_mapper_endpoint_redacts_pii(monkeypatch):
     assert response.json()["business_result"] == {"mapped": True}
     assert "Taylor Example" not in response.text
     assert "taylor@example.invalid" not in response.text
+
+
+def test_forms_api_workflow_uses_response_id_and_redacts_source_pii():
+    client = TestClient(create_app())
+    form_id = "syntheticGoogleForm123"
+    question_fields = {
+        "q-name": ("Tên đầy đủ", "Taylor Example"),
+        "q-email": ("Email address", "taylor@example.invalid"),
+        "q-phone": ("Phone (optional)", "+15550102030"),
+        "q-service": ("Service requested", "Workflow automation"),
+        "q-description": ("Describe your request", "Synthetic Forms API request."),
+    }
+    payload = {
+        "form_id": form_id,
+        "form": {"formId": form_id, "items": [
+            {"title": title, "questionItem": {"question": {"questionId": question_id}}}
+            for question_id, (title, _) in question_fields.items()
+        ]},
+        "response": {"responseId": "syntheticResponse456", "answers": {
+            question_id: {"textAnswers": {"answers": [{"value": value}]}}
+            for question_id, (_, value) in question_fields.items()
+        }},
+    }
+    response = client.post(
+        "/v1/workflow-instances/portfolio.lead_management_google_forms_api/runs",
+        json={"payload": payload},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["steps"]["map"]["business_result"] == {"mapped": True}
+    assert body["steps"]["intake"]["business_result"]["qualification"]["status"] == "REVIEW_REQUIRED"
+    assert body["steps"]["store"]["business_result"]["state"] == "PREVIEWED"
+    assert "Taylor Example" not in response.text
+    assert "taylor@example.invalid" not in response.text
+    assert "Synthetic Forms API request" not in response.text
 
 
 def test_ghl_module_endpoint_is_exposed_without_leaking_runtime_token(monkeypatch):

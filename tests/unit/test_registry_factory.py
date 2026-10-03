@@ -3,6 +3,7 @@ from workflow_automation.models import ModuleInstance
 from workflow_automation.modules.processing.validate import Validate
 from workflow_automation.modules.output.gmail_send import GmailSend
 from workflow_automation.modules.input.google_form_response import GoogleFormResponseRow
+from workflow_automation.modules.input.google_forms_api_response import GoogleFormsApiResponse
 from workflow_automation.registry_factory import build_registry
 
 
@@ -71,3 +72,13 @@ def test_google_form_mapper_uses_local_sheet_identity_and_keeps_ids_out_of_catal
     assert module.sheet_id == 99017
     assert registry.workflow_instances["portfolio.lead_management_google_form"].workflow_definition_id == "lead_management_google_form"
     assert "GOOGLE_FORM_SPREADSHEET_ID" not in str(instance.model_dump())
+
+
+def test_forms_api_source_module_is_bound_without_account_credentials():
+    registry = build_registry()
+    instance = registry.instances["portfolio.google_forms_api_response_map"]
+    assert instance.module == "source.google_forms_api_response"
+    assert isinstance(registry.instance_modules[instance.instance_id], GoogleFormsApiResponse)
+    assert registry.workflow_instances[
+        "portfolio.lead_management_google_forms_api"
+    ].workflow_definition_id == "lead_management_google_forms_api"

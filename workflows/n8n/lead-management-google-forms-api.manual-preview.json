@@ -1,0 +1,35 @@
+{
+  "name": "Lead Management — Google Forms API shape (synthetic preview)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "8fa41eb5-43df-45cf-8c17-cf5d5b67a725",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [220, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/v1/workflow-instances/portfolio.lead_management_google_forms_api/runs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { payload: { form_id: 'syntheticGoogleForm123', form: { formId: 'syntheticGoogleForm123', items: [ { title: 'Tên đầy đủ', questionItem: { question: { questionId: 'q-name' } } }, { title: 'Email address', questionItem: { question: { questionId: 'q-email' } } }, { title: 'Phone (optional)', questionItem: { question: { questionId: 'q-phone' } } }, { title: 'Service requested', questionItem: { question: { questionId: 'q-service' } } }, { title: 'Describe your request', questionItem: { question: { questionId: 'q-description' } } } ] }, response: { responseId: 'syntheticResponse456', answers: { 'q-name': { textAnswers: { answers: [ { value: 'Taylor Example' } ] } }, 'q-email': { textAnswers: { answers: [ { value: 'taylor@example.invalid' } ] } }, 'q-phone': { textAnswers: { answers: [ { value: '+15550102030' } ] } }, 'q-service': { textAnswers: { answers: [ { value: 'Workflow automation' } ] } }, 'q-description': { textAnswers: { answers: [ { value: 'Synthetic Forms API preview only.' } ] } } } } }, context: { workflow_id: 'lead_management_google_forms_api', attempt: 1, mode: 'DRY_RUN' } } }}",
+        "options": {"timeout": 30000}
+      },
+      "id": "17ad4948-51a1-47d5-a492-cc420b3b4d21",
+      "name": "Preview synthetic Form response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 320]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {"main": [[{"node": "Preview synthetic Form response", "type": "main", "index": 0}]]}
+  },
+  "active": false,
+  "settings": {"executionOrder": "v1", "saveDataErrorExecution": "none", "saveDataSuccessExecution": "none"},
+  "meta": {"templateCredsSetupCompleted": true},
+  "tags": []
+}

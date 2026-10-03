@@ -1,12 +1,12 @@
-# Lead management reference instance (v2)
+# Lead management reference instance (v3)
 
 This is a private, synthetic/local reference workflow inspired by the supplied Upwork brief. It is not a completed GHL delivery.
 
 ## Current graph
 
 ```text
-Google Sheets Trigger `anyUpdate` (`change_type == added` only)
-  → source.google_form_response: map one row using exact configured headers and row number
+Google Forms API polling (read-only schema + response scopes; inactive template)
+  → source.google_forms_api_response: map one response by exact question title/ID and responseId
   → lead.intake: trim, normalize email/phone, enforce bounded field sizes,
     flag missing/invalid fields and fingerprint payload
   → lead.qualify: require an explicit rubric and accepted classes; use a model
@@ -16,7 +16,7 @@ Google Sheets Trigger `anyUpdate` (`change_type == added` only)
 
 The current portfolio path does not call a live LLM, create a CRM contact/opportunity, or send a message. No qualification rubric, GHL test Location, or OpenAI API key is available. It therefore preserves the request and marks it for human review rather than guessing a sales class or summary. A synthetic rubric/fixture can exercise the classification composition without a paid provider call.
 
-The existing manual/local instance still accepts a canonical lead object. A second instance, `portfolio.lead_management_google_form`, accepts a new row from the private response Sheet and maps it before the same downstream pipeline. The response Sheet's metadata and headers were read through the connected Google Drive/Sheets account; it currently has only the header row. Its account-specific IDs are in ignored local `.env`, not source control. See [Google Form row adapter](google-form-response.md).
+The existing manual/local instance still accepts a canonical lead object. The earlier `portfolio.lead_management_google_form` instance accepts a row from the linked response Sheet. The selected portfolio composition is `portfolio.lead_management_google_forms_api`: it maps one Forms API response using the matching form schema before reusing the same downstream pipeline. Its mapper and inactive polling export are synthetic-tested; owner OAuth, exact live schema, n8n import, and API access remain unverified. See [Google Forms API response adapter](google-forms-api-response.md).
 
 The reusable `crm.ghl_upsert_contact` and `crm.ghl_upsert_opportunity` adapters are implemented separately and synthetic-test verified. They are not composed into this portfolio workflow because the GHL account, Location, contact duplicate policy, pipeline/stage IDs, and field mapping are not configured. See [GHL contact upsert](ghl-contact-upsert.md) and [GHL opportunity upsert](ghl-opportunity-upsert.md).
 
@@ -40,15 +40,17 @@ The reusable `crm.ghl_upsert_contact` and `crm.ghl_upsert_opportunity` adapters 
 - Qualification currently has no durable cross-process idempotency ledger, cost ceiling, or cache. Replaying an event in REAL mode can trigger another billable call. Do not use real data or unrestricted retries until this is addressed.
 - Intake module responses expose the review status/reasons but suppress name, email, phone, and enquiry text. The database retains the input record and therefore still requires access controls and synthetic-only use for this reference.
 - No reply/book/opt-out/manual-pause event source or follow-up suppression scheduler is wired.
-- The Google Form is unpublished; the Google Sheets trigger export is inactive and has placeholder IDs and no credential. Its preview request uses `DRY_RUN`. The local services bind only to loopback. No external endpoint is exposed. The user's VPS is explicitly out of scope.
+- The Google Form is unpublished; the Forms API export is inactive, has a placeholder Form ID and no credential, and defaults to `DRY_RUN`. Its question-title mapping has not been checked against the live Forms API schema. The prior Sheets export remains optional. The local services bind only to loopback. No external endpoint is exposed. The user's VPS is explicitly out of scope.
+- The polling cursor is n8n workflow static data. It is a single-instance, low-volume reference only: overlapping runs are not serialized and the cursor is not a distributed checkpoint. Partial batches keep the prior cursor and revisit earlier response IDs; PostgreSQL suppresses same-event replays and flags changed payloads for review. Production multi-worker/high-volume use needs an atomic database checkpoint or lease first.
 - This does not establish privacy/legal readiness for real prospect data. Keep current runs synthetic.
 
 ## Module boundaries
 
 - `source.google_form_response`: deterministic adapter from one n8n Google Sheets Trigger row to the source-event lead contract; no Google OAuth is held by the API.
+- `source.google_forms_api_response`: deterministic mapper from one Forms API `FormResponse` and matching schema to the source-event lead contract; OAuth stays in n8n and the stable event key is `<formId>:<responseId>`.
 - `lead.intake`: platform-neutral normalization and review-flag behavior.
 - `lead.store`: local PostgreSQL event persistence and event-key idempotency.
-- `lead.qualify` is implemented as a configurable LLM/review module; its OpenAI path remains unverified without a separately provisioned API credential. Reusable Gmail send and GHL opportunity modules now exist but are not composed because sender OAuth, GHL, and owner-approved follow-up/suppression policies are unavailable. The Google Form row-mapping stage is implemented; the native Google Sheets Trigger still needs an n8n OAuth credential, an import, and a live event check.
+- `lead.qualify` is implemented as a configurable LLM/review module; its OpenAI path remains unverified without a separately provisioned API credential. Reusable Gmail send and GHL opportunity modules now exist but are not composed because sender OAuth, GHL, and owner-approved follow-up/suppression policies are unavailable. The Forms API source mapper/poller is implemented as an inactive export; it still needs owner-approved read-only OAuth, live schema/title confirmation, n8n import, and a live event check.
 
 ## Local manual run
 

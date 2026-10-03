@@ -2,6 +2,8 @@
 
 Status: local account schema inspected; module and composed workflow are fixture/synthetic verified. No Google API call, response submission, live n8n trigger, or prospect-data processing has occurred.
 
+**Portfolio source decision:** the user selected the Google Forms API read-only path in DEC-010. This document now describes the optional Google Sheets row adapter; it is not the selected path for connecting the portfolio Form. See [Google Forms API response source](google-forms-api-response.md).
+
 ## Source evidence and contract
 
 - The connected Google Drive account contains a private response spreadsheet for `Lead Intake Lab - Test Only`. Its only visible tab is `Câu trả lời biểu mẫu 1`; row 1 contains six headers and row 2 is empty. The account-specific spreadsheet/tab IDs are stored only in the ignored local `.env`.
@@ -18,7 +20,7 @@ The source workflow is inactive, has no embedded Google or API credential, uses 
 
 ### OAuth and identity design gate
 
-Do not connect the Google Sheets Trigger to the owner's main Drive account yet. For this node/version, the `Row Added or Updated` mode needs Sheet edit permission and the bundled credential requests broad Drive/Sheets scopes. Official Google Forms API `forms.responses.list` also exposes an alternative: read responses with the `forms.responses.readonly` scope, and each response has a response ID that can serve as the idempotency identity. Before any live OAuth, prefer evaluating a Forms API polling adapter with response-ID persistence; it still needs owner-authorized OAuth and has not been implemented or verified here. The narrower scope is read-only for Forms responses, but it can read responses from the account's forms, so consent remains a real account-level decision.
+The selected portfolio connection uses the separate Forms API adapter documented in [google-forms-api-response.md](google-forms-api-response.md). This Sheets adapter remains optional. Do not connect it to the owner's main Drive account without a separate need: for the inspected n8n version, `Row Added or Updated` requires Sheet edit permission and bundled credentials request broad Drive/Sheets scopes. The Forms API alternative uses two read-only Forms scopes, but consent still grants access to Forms schema and responses in the authorized account.
 
 ## Failure and privacy boundaries
 

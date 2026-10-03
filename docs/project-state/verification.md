@@ -1,3 +1,15 @@
+## Current release 0.8.0 — Google Forms API read-only source
+
+- Implemented a pure `source.google_forms_api_response` adapter, registered the `portfolio.lead_management_google_forms_api` composition, an inactive five-minute n8n polling export, and a separate synthetic manual preview. Mapping uses exact Form question titles/question IDs and `<formId>:<responseId>` event identity.
+- OAuth design is limited to `forms.body.readonly` for schema and `forms.responses.readonly` for response listing. No OAuth was granted, no Forms API call was made, and the Form remains unpublished with no submitted response. The n8n workflows were not imported or activated.
+- The polling template defaults to `DRY_RUN`; its placeholder Form ID and OAuth credential are not populated. `DRY_RUN` never advances its cursor. `MOCK` database writes require the local API bearer credential configured in n8n. Paid model execution is not ready because there is no durable pre-call idempotency/cost gate.
+- The static export asserts inactive state, no embedded credentials, bounded page requests, stable response identity, and cursor advancement only after accepted storage results. Code-node syntax and JSON were checked locally; this does not establish a live n8n runtime or execute Google pagination.
+- Docker/PostgreSQL integration (`tests/integration/google_forms_api_lead_postgres.py`) returned `STORED`, same-response `DUPLICATE`, and changed-payload `PAYLOAD_CONFLICT_REVIEW`; the script removed its synthetic row, and a follow-up SQL count was zero. It did not contact Google or n8n. API health returned `ok` and OpenAPI version `0.8.0`.
+- `.venv\Scripts\python.exe -m pytest -q`: **153 passed, 1 Starlette deprecation warning**. `uv lock --check --offline`, `compileall`, and `git diff --check` passed. Node parsed both export JSON files and compiled every n8n Code node with `new Function` successfully.
+- The cursor uses n8n workflow static data for a single-instance, low-volume reference only. Overlapping runs are not serialized; this is not a distributed checkpoint or high-volume guarantee. Production multi-worker use needs an atomic database checkpoint/lease.
+
+---
+
 # Verification and gaps
 
 ## Checks completed

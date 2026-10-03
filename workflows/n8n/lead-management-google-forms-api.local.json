@@ -1,0 +1,145 @@
+{
+  "name": "Lead Management — Google Forms API (private local)",
+  "nodes": [
+    {
+      "parameters": {"rule": {"interval": [{"field": "minutes", "minutesInterval": 5}]}},
+      "id": "4f10b6db-2495-42d3-babb-8856d4dadf82",
+      "name": "Poll every 5 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 320]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const state = $getWorkflowStaticData('global');\nreturn [{ json: { form_id: 'REPLACE_WITH_PRIVATE_GOOGLE_FORM_ID', last_submitted_time: state.lastSubmittedTime || null, run_mode: 'DRY_RUN' } }];"
+      },
+      "id": "992d61d8-045a-444b-87e4-9183aee7126a",
+      "name": "Read cursor and form config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 320]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://forms.googleapis.com/v1/forms/' + $json.form_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {"timeout": 30000}
+      },
+      "id": "7b322dc0-b7f0-4f12-920a-8e73d91b7fb8",
+      "name": "Read Form question schema",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 320],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://forms.googleapis.com/v1/forms/' + $('Read cursor and form config').first().json.form_id + '/responses?pageSize=500' + ($('Read cursor and form config').first().json.last_submitted_time ? '&filter=' + encodeURIComponent('timestamp >= ' + $('Read cursor and form config').first().json.last_submitted_time) : '') }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "timeout": 30000,
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {"parameters": [{"type": "qs", "name": "pageToken", "value": "={{ $response.body.nextPageToken }}"}]},
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.nextPageToken }}",
+              "limitPagesFetched": true,
+              "maxRequests": 20,
+              "requestInterval": 250
+            }
+          }
+        }
+      },
+      "id": "886df706-b82d-43cc-b3bc-5b5c3af7b8a4",
+      "name": "List Form responses",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 320],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const pages = $input.all().map(item => item.json);\nif (!pages.length) return [{ json: { no_responses: true } }];\nconst finalPage = pages[pages.length - 1];\nif (finalPage.nextPageToken) throw new Error('Google Forms response page cap reached; cursor was not advanced. Increase the bounded page cap or reconcile backlog.');\nconst responses = pages.flatMap(page => Array.isArray(page.responses) ? page.responses : []);\nif (!responses.length) return [{ json: { no_responses: true } }];\nconst form = $('Read Form question schema').first().json;\nconst config = $('Read cursor and form config').first().json;\nreturn responses.map(response => {\n  const rawTime = response.lastSubmittedTime || response.createTime;\n  const milliseconds = Date.parse(rawTime || '');\n  if (!response.responseId || !Number.isFinite(milliseconds)) throw new Error('Form response is missing a stable responseId or valid timestamp.');\n  return { json: { form_id: config.form_id, form, response, response_time_ms: milliseconds, run_mode: config.run_mode } };\n});"
+      },
+      "id": "3f5056c6-6951-420e-83b7-27f636a06ed8",
+      "name": "Prepare response events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1160, 320]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+          "conditions": [{"id": "4dd8e945-7ce9-4cfd-b72e-eae1f9206752", "leftValue": "={{ $json.no_responses === true }}", "rightValue": true, "operator": {"type": "boolean", "operation": "true", "singleValue": true}}],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e76a286e-cc4b-4f47-a3f8-191e3f421927",
+      "name": "No new responses?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1380, 320]
+    },
+    {
+      "parameters": {},
+      "id": "8c43602b-7a70-4e2f-91a6-a8e26fd3ef08",
+      "name": "No new responses",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1600, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/v1/workflow-instances/portfolio.lead_management_google_forms_api/runs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { payload: { form_id: $json.form_id, form: $json.form, response: $json.response }, context: { workflow_id: 'lead_management_google_forms_api', attempt: 1, mode: $json.run_mode } } }}",
+        "options": {"timeout": 30000}
+      },
+      "id": "67198120-7eb0-4b85-8cd1-68a0748e3f64",
+      "name": "Run local lead workflow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1600, 460],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const results = $input.all().map(item => item.json);\nconst sourceEvents = $('Prepare response events').all().map(item => item.json);\nif (results.length !== sourceEvents.length) throw new Error('Not every fetched response has a workflow result; cursor remains unchanged.');\nfor (const result of results) {\n  const state = result?.steps?.store?.business_result?.state;\n  if (!['STORED', 'DUPLICATE', 'PREVIEWED'].includes(state)) throw new Error('At least one response did not reach an accepted storage state; cursor remains unchanged.');\n}\nconst mode = $('Read cursor and form config').first().json.run_mode;\nif (mode !== 'MOCK' && mode !== 'REAL') return [{ json: { cursor_advanced: false, reason: 'DRY_RUN does not consume source responses' } }];\nconst maxMilliseconds = Math.max(...sourceEvents.map(event => event.response_time_ms));\nconst state = $getWorkflowStaticData('global');\nconst previous = Date.parse(state.lastSubmittedTime || '') || 0;\nstate.lastSubmittedTime = new Date(Math.max(previous, maxMilliseconds)).toISOString();\nreturn [{ json: { cursor_advanced: true, last_submitted_time: state.lastSubmittedTime, processed: results.length } }];"
+      },
+      "id": "9b3a9467-04ae-4118-9130-cc32783506de",
+      "name": "Advance cursor after successful storage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1840, 460]
+    }
+  ],
+  "connections": {
+    "Poll every 5 minutes": {"main": [[{"node": "Read cursor and form config", "type": "main", "index": 0}]]},
+    "Read cursor and form config": {"main": [[{"node": "Read Form question schema", "type": "main", "index": 0}]]},
+    "Read Form question schema": {"main": [[{"node": "List Form responses", "type": "main", "index": 0}]]},
+    "List Form responses": {"main": [[{"node": "Prepare response events", "type": "main", "index": 0}]]},
+    "Prepare response events": {"main": [[{"node": "No new responses?", "type": "main", "index": 0}]]},
+    "No new responses?": {"main": [[{"node": "No new responses", "type": "main", "index": 0}], [{"node": "Run local lead workflow", "type": "main", "index": 0}]]},
+    "Run local lead workflow": {"main": [[{"node": "Advance cursor after successful storage", "type": "main", "index": 0}]]}
+  },
+  "active": false,
+  "settings": {"executionOrder": "v1", "saveDataErrorExecution": "none", "saveDataSuccessExecution": "none"},
+  "meta": {"templateCredsSetupCompleted": false},
+  "tags": []
+}

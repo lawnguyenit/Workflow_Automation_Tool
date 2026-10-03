@@ -68,7 +68,7 @@ class WorkflowRunRequest(BaseModel):
 def create_app() -> FastAPI:
     registry = build_registry()
     runner = WorkflowRunner(registry)
-    app = FastAPI(title="Workflow Automation Module API", version="0.7.0")
+    app = FastAPI(title="Workflow Automation Module API", version="0.8.0")
     app.state.registry = registry
     app.state.runner = runner
 
@@ -113,9 +113,10 @@ def create_app() -> FastAPI:
         logger.info("Module run finished instance_id=%s run_id=%s status=%s", instance_id,
                     context.run_id, result.status.value)
         public_result = result.model_dump(mode="json")
-        if instance.module in {"lead.intake", "lead.qualify", "source.google_form_response"}:
+        if instance.module in {"lead.intake", "lead.qualify", "source.google_form_response",
+                               "source.google_forms_api_response"}:
             lead = public_result.get("business_result", {}).get("lead")
-            if instance.module == "source.google_form_response":
+            if instance.module in {"source.google_form_response", "source.google_forms_api_response"}:
                 public_result["business_result"] = {"mapped": isinstance(lead, dict)}
             else:
                 public_result["business_result"] = {
@@ -134,7 +135,8 @@ def create_app() -> FastAPI:
         if len(matching_instances) != 1:
             raise HTTPException(status_code=409, detail="Workflow must have exactly one default instance for this route")
         payload = request.payload
-        if workflow_id in {"lead_management_intake", "lead_management_google_form"}:
+        if workflow_id in {"lead_management_intake", "lead_management_google_form",
+                           "lead_management_google_forms_api"}:
             payload.setdefault("criteria", None)
             payload.setdefault("mock_qualification", None)
             payload.setdefault("replay_qualification", None)
@@ -167,7 +169,8 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="Unknown workflow instance")
         workflow_id = instance.workflow_definition_id
         payload = request.payload
-        if workflow_id in {"lead_management_intake", "lead_management_google_form"}:
+        if workflow_id in {"lead_management_intake", "lead_management_google_form",
+                           "lead_management_google_forms_api"}:
             payload.setdefault("criteria", None)
             payload.setdefault("mock_qualification", None)
             payload.setdefault("replay_qualification", None)
