@@ -4,10 +4,10 @@ decisions:
   - id: DEC-JOB-001
     question: "Which source should the portfolio instance use?"
     options_considered: ["Google Forms API read-only", "Google Sheets Trigger", "Public webhook"]
-    decision: "Google Forms API with Forms body and responses read-only scopes; private unpublished test Form only."
+    decision: "Use the Google Forms API source for the private unpublished test Form. If configured, it requires Forms body and response read-only scopes; those scopes cover every Form available to the authorized account, so account selection remains a separate unresolved gate."
     status: approved
     owner: user
-    evidence_or_rationale: "User selected Forms API read-only; minimizes source access and avoids a public endpoint."
+    evidence_or_rationale: "User selected Forms API read-only and a private test Form. This avoids a public endpoint and limits requested APIs to Forms, but Google scopes are account-wide rather than restricted to that one Form."
     date: 2026-10-03
     supersedes: null
   - id: DEC-JOB-002
@@ -22,10 +22,10 @@ decisions:
   - id: DEC-JOB-003
     question: "May the separate Google API Services User Data Policy checkbox be accepted to create OAuth branding?"
     options_considered: ["Accept and continue", "Do not accept; stop Google OAuth setup"]
-    decision: "Unresolved; no checkbox was selected or submitted."
-    status: unresolved
+    decision: "Accepted for the private, testing-only OAuth app after the user said to begin; this decision covers the User Data Policy checkbox and branding setup only, not adding broad Forms scopes, creating OAuth credentials, or granting access."
+    status: approved
     owner: user
-    evidence_or_rationale: "This is separate from the Google APIs Terms of Service approval and remains an explicit pending owner confirmation."
+    evidence_or_rationale: "The user was shown the policy purpose and testing boundaries, then replied 'bắt đầu' to the specific request to accept it for this private Forms read-only test project. The Google Auth Platform now reports OAuth configuration created."
     date: 2026-10-03
     supersedes: null
   - id: DEC-JOB-004

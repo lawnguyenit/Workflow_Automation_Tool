@@ -9,7 +9,7 @@ The workflow needs these two read-only scopes:
 - `https://www.googleapis.com/auth/forms.body.readonly` — Form question schema.
 - `https://www.googleapis.com/auth/forms.responses.readonly` — submitted responses.
 
-The grant allows this local n8n instance to read Forms data available to the Google account that approves it. Do not use a client/customer account or real prospect responses for this practice run. The OAuth client secret and granted tokens belong in n8n/Google's credential stores; never paste them into chat, workflow JSON, `.env`, or Git.
+The grant allows this local n8n instance to read Forms data available to the Google account that approves it. These scopes are not restricted to one Form. For a lower-exposure practice setup, use a dedicated Google test account and share only the private test Form with that account; then the grant can read only Forms that account can access. Do not use a client/customer account or real prospect responses for this practice run. The OAuth client secret and granted tokens belong in n8n/Google's credential stores; never paste them into chat, workflow JSON, `.env`, or Git.
 
 ## Owner setup in Google Cloud
 
@@ -39,4 +39,4 @@ After the credential is connected:
 4. Keep the workflow inactive and run one manual test with a synthetic-only Form. The export currently uses `DRY_RUN`; it does not consume/advance the source cursor in that mode.
 5. Check the execution result and local API response before deciding whether to submit a synthetic test response. Publishing a Form can make it available to respondents; do that only when the owner intentionally chooses its audience and access settings.
 
-The repository contains a separate manual preview that uses synthetic Form data and makes no Google request. The poller is imported but has not been executed; no Google OAuth grant has been made. Its current local import has no credential or real Form ID and remains inactive. The private Form's visible question titles were checked in the owner's browser and match the mapper, but this does not verify the API's question IDs or Forms API access.
+The repository contains a separate manual preview that uses synthetic Form data and makes no Google request. OAuth branding is configured in Google Cloud as External/Testing, with the owner's account as the only test user; the separate Google API Services User Data Policy was accepted for this private test app. No Forms scopes are configured, no OAuth client or grant has been created, and the poller has not been executed. Its current local import has no credential or real Form ID and remains inactive. Before adding scopes, the owner must choose the current account or a dedicated test account shared only to the private test Form. The private Form's visible question titles were checked in the owner's browser and match the mapper, but this does not verify the API's question IDs or Forms API access.

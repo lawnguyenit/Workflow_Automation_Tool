@@ -5,7 +5,7 @@ This folder tracks the supplied Upwork brief as a bounded portfolio exercise. It
 ## Current state
 
 - Intake is bounded; local source/module discovery is recorded.
-- The pipeline design is **proposed**, not design-ready for live execution. GHL matching/pipeline rules, AI rubric/budget, follow-up policy/event sources, and the separate Google User Data Policy decision remain owner-controlled gates.
+- The pipeline design is **proposed**, not design-ready for live execution. Google OAuth branding is configured in External/Testing mode and the user accepted the separate Google User Data Policy for this private test app. Choosing whether Forms scopes apply to the current Google account or a dedicated test account remains an owner gate, along with GHL matching/pipeline rules, AI rubric/budget, and follow-up policy/event sources.
 - No live Forms, GHL, LLM, or lead-follow-up operation has been executed. The test Form is private/unpublished and the n8n poller remains inactive.
 - The current independent audit is [AUDIT-0.12.0.yaml](../AUDIT-0.12.0.yaml), verdict `FAILED_AUDIT` for the full brief.
 

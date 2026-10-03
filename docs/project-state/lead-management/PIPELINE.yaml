@@ -230,7 +230,7 @@ edges:
     side_effects_and_data_boundaries: "Alert and operator store are separate effects; alert failure cannot erase the original failure state."
     verification: ["No composed lead alert path."]
 stop_and_recovery:
-  - "No Google Auth Platform submission, OAuth client creation, consent, or Forms request until the owner confirms the separate User Data Policy checkbox."
+  - "OAuth branding exists in External/Testing mode. Do not add Forms scopes or create a consent grant until the owner chooses the account-level access boundary; then verify only the Forms body/responses read-only scopes."
   - "Do not activate the poller or read any Form responses until OAuth scopes and the private Form ID are checked; use synthetic-only response data."
   - "Do not run GHL writes until account, Location, matching, custom fields, tags, pipeline, stage, and opportunity rules are approved."
   - "Do not make paid model calls until API credential, rubric, privacy decision, and provider-side monetary spend cap are configured."
@@ -246,7 +246,7 @@ workflow_success_condition: >-
   stop event blocks it; failures alert an owner and recover without duplicate effects;
   secret-free export and handover are reviewed and accepted by the user.
 unresolved_items:
-  - "Google policy checkbox and OAuth client/grant/Form ID remain owner access gates."
+  - "Google policy acceptance is complete for private test branding. Account-level Forms scope choice, OAuth client/grant, and private Form ID remain owner access gates."
   - "Local API bearer credential is not assigned to n8n MOCK/REAL requests."
   - "GHL/AI accounts and all business-specific mappings/rubric/budgets are absent."
   - "No durable composed CRM/send outbox, authoritative stop-event ingestion, alert destination, or tested operator recovery path exists."

@@ -5,7 +5,7 @@ caller: workflow lead
 callee: workflow lead
 question_and_scope: "Inspect existing Forms source, lead modules, local runtime, account gates, and failure semantics without calling external providers."
 method_and_environment: "Repository source/docs, n8n 2.41.6 workflow records, Docker Compose API/PostgreSQL, synthetic integration harnesses."
-access_basis: "User authorized a private read-only Forms API portfolio setup. Google API Terms approval does not replace pending confirmation for the separate Google API Services User Data Policy. No live Form access is authorized/configured yet."
+access_basis: "User authorized a private read-only Forms API portfolio setup and accepted the separate Google API Services User Data Policy for private OAuth branding. No Forms scopes or OAuth grant are configured. The user is deciding whether the broad account-level Forms scope applies to the current account or a dedicated test account."
 navigation_journey:
   - step: "Inspect lead workflow definitions and module documentation."
     url_or_control: "src/workflow_automation/definitions.py; docs/modules/lead-management-reference.md"
@@ -17,7 +17,7 @@ navigation_journey:
     evidence_type: observed
   - step: "Inspect Google setup status."
     url_or_control: "Google Cloud Console setup recorded in project-state verification"
-    observation: "Dedicated project and Forms API exist/enabled. Auth branding setup is unsubmitted at owner policy confirmation. No OAuth client/grant/request or Form response read."
+    observation: "Dedicated project and Forms API are enabled. Auth branding exists in External/Testing mode with only the owner's account as a test user. Data Access has no scopes. No OAuth client/grant/request or Form response read."
     evidence_type: documented
 requested_field_map:
   - field: "name"
@@ -49,7 +49,7 @@ pagination_and_rendering:
     - "Google response pages and n8n Forms API HTTP failures remain live-unverified."
     - "Source-event dedupe is not person-level, CRM, or message idempotency."
 access_and_failures:
-  auth_or_session: "Forms OAuth not configured; no grant. Local API MOCK/REAL calls also lack n8n bearer credential."
+  auth_or_session: "OAuth branding is configured but no Forms scopes, OAuth client, or grant exist. Local API MOCK/REAL calls also lack an n8n bearer credential."
   captcha_denial_throttle_or_robot_control: "not_applicable to the selected official API path; provider quota/rate response still needs live validation."
   observed_errors:
     - "No external provider error has been exercised in the poller."
@@ -65,9 +65,9 @@ module_and_edge_implications:
   - "Follow-up gate and Gmail sender are separate; authoritative lifecycle events and policy must be provided."
   - "Because the poller can commit after local storage, any added CRM/send effects need durable per-effect idempotency, retry/reconciliation and alerting before the cursor can claim full completion."
 unknowns:
-  - question: "Will the owner accept the separate Google API Services User Data Policy checkbox and configure OAuth?"
+  - question: "Which Google account should receive the two Forms read-only scopes?"
     owner: user
-    verification_or_stop_condition: "Do not submit Google Auth branding or request consent until explicit owner confirmation; then inspect exact read-only scopes in the UI."
+    verification_or_stop_condition: "Wait for the owner to choose the current account or a dedicated account shared only to the test Form; then inspect exact read-only scopes before any consent grant."
   - question: "Which GHL contact/field/tag/pipeline rules should be used?"
     owner: user
     verification_or_stop_condition: "Wait for a GHL test Location and explicit mapping/match decisions."

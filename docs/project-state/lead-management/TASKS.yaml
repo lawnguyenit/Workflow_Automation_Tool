@@ -4,18 +4,18 @@ tasks:
   - id: TASK-001
     caller: workflow lead
     callee: user
-    objective: "Confirm the separate Google API Services User Data Policy checkbox decision."
+    objective: "Record the user's decision on the separate Google API Services User Data Policy checkbox."
     inputs: ["DEC-JOB-003", "Google Auth Platform final setup screen"]
     expected_output: "Explicit accept-or-stop decision; no secret values."
     owner: user
     allowed_files: []
     dependencies: []
-    preconditions: ["User understands this is separate from the already accepted Google APIs Terms of Service and authorizes read-only Forms scope only."]
+    preconditions: ["User understands this is separate from the already accepted Google APIs Terms of Service and that acceptance does not configure OAuth scopes or grant Form access."]
     must_not_change: ["Do not publish the Form", "Do not create OAuth client/secret before this decision", "Do not activate workflow"]
     blocking_or_stop_condition: "No response means OAuth setup remains stopped."
     acceptance_checks: ["Decision recorded in DECISIONS.yaml before any checkbox submission."]
-    verification: []
-    status: blocked
+    verification: ["User replied 'bắt đầu' after the exact User Data Policy and private testing-only scope were described; Google Auth Platform then displayed 'OAuth configuration created!' and app is External/Testing with the owner as sole test user."]
+    status: completed
   - id: TASK-002
     caller: workflow lead
     callee: user
@@ -27,7 +27,7 @@ tasks:
     dependencies: [TASK-001]
     preconditions: ["Explicit policy checkbox decision", "OAuth redirect URI verified in n8n", "scope list inspected"]
     must_not_change: ["No public publishing/tunnel", "No credential in chat/Git/workflow export", "No real respondents"]
-    blocking_or_stop_condition: "Owner may stop at any Google consent screen that requests broader/write scopes."
+    blocking_or_stop_condition: "Wait for the owner to choose current-account access or a dedicated test account before configuring Forms scopes; owner creates and enters OAuth client credentials in protected UIs. Stop if Google requests broader/write scopes."
     acceptance_checks: ["Consent lists only forms.body.readonly and forms.responses.readonly", "credential connects to intended account", "Form remains unpublished"]
     verification: ["Owner-observed read-only API call with synthetic-only Form data; verify schema and response mapping."]
     status: blocked

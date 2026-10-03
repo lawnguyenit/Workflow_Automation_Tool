@@ -53,7 +53,7 @@ intended_use: "Portfolio practice for future n8n/automation jobs; not a client p
 retention: "Unknown for any future real provider data; current tests use synthetic data and local retention only."
 access_facts:
   - "Gmail and Outlook accounts exist with 2FA; the local automation runtime has no Gmail sender credential."
-  - "Google Forms API is enabled in a dedicated project; Google Auth Platform branding setup is unsubmitted pending separate owner confirmation. No OAuth client/grant or Forms API request exists."
+  - "Google Forms API is enabled in a dedicated project. OAuth branding is configured as External/Testing after the user's User Data Policy decision; only the owner's account is a test user. No Forms scopes, OAuth client/grant, or Forms API request exists. The account whose Forms should be accessible remains undecided because the two read-only scopes cover every Form that account can access."
   - "The private Form remains unpublished with zero responses; exact API question IDs are unverified."
   - "No GHL/CRM account or OpenAI API key is available. ChatGPT Plus does not supply an OpenAI API credential."
   - "No public HTTPS endpoint is configured. Local API and n8n bind to loopback; VPS is excluded."
@@ -97,10 +97,10 @@ acceptance_criteria:
     state: confirmed
 unknowns:
   - id: UNK-001
-    question: "Will the owner accept Google API Services User Data Policy and complete read-only Forms OAuth setup?"
+    question: "Should the Forms read-only scopes apply to the current Google account or to a dedicated test account with only the test Form shared to it?"
     owner: user
     blocking: true
-    verification_or_stop_condition: "Wait for explicit confirmation of the separate checkbox; then the owner creates/enters client credentials directly in the Google/n8n UI and inspects requested read-only scopes."
+    verification_or_stop_condition: "Wait for the account-scope choice before adding Forms scopes. The owner creates/enters OAuth client credentials directly in Google/n8n; inspect that consent requests only forms.body.readonly and forms.responses.readonly."
   - id: UNK-002
     question: "Can the owner provide a GHL test account/Location and approve matching, fields, tags, pipeline and opportunity rules?"
     owner: user
