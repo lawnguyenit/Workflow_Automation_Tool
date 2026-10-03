@@ -59,4 +59,13 @@ The original audit below captured the pre-0.4.0 state and is retained as histori
 - Full Upwork scope remains incomplete by design/account availability; user account and business inputs determine the next binding work.
 - Verified behavior: 76 unit tests, compile checks, repeatable migration, local Docker API/PostgreSQL integration for stored/duplicate/conflict/missing-field review, and API output redaction.
 - Not verified: n8n UI execution, connected form ingestion, email, live GHL, OpenAI, follow-up suppression, general database capacity/failover, or client acceptance. Same-key guarded GHL concurrency was checked separately with synthetic provider responses.
-- No email was sent and no CRM account was modified. Four synthetic rows remain in the local database.
+- At the time of this original audit disposition, no email had yet been sent and no CRM account had been modified. Four synthetic lead rows remained in the local database; the later app-level self-test is recorded above and did not change CRM state.
+
+## Independent re-review — 2026-10-03 (0.6.0 worktree)
+
+The independent deliverable auditor reviewed the current 0.6.0 implementation and evidence. Its conclusion remains **incomplete for the supplied Upwork brief**: the local lead path has no connected intake, live qualification provider/rubric, GHL account/pipeline binding, composed follow-up/suppression, alert/recovery process, n8n UI run, or end-to-end acceptance. The new Gmail sender is a separately callable output adapter and is not composed into the lead workflow. One app-level self-addressed email test is account evidence only; it does not validate this module or any lead workflow.
+
+- **Gmail module evidence:** local unit suite and a Docker/PostgreSQL harness with an unconditionally mocked Gmail HTTP transport verify outbox claims, duplicate suppression, changed-payload rejection, confirmed-send payload redaction, and unknown-outcome hold. No local Gmail OAuth token or n8n credential was exercised.
+- **Audit findings addressed:** project-state wording now distinguishes that single self-addressed app test from the absence of lead-workflow email and CRM writes. The auditor's retention/reconciliation concern remains documented: uncertain sends retain message content until an operator checks Gmail Sent and reconciles the outbox; no automatic retry is safe.
+- **Current scope disposition:** do not present this as delivery of the Upwork job. It is a synthetic local reference plus reusable adapters. GHL/OpenAI/live form, policy choices, stop events, and acceptance remain open.
+- **Historical note:** the final bullet in the original audit disposition above reflects evidence at that audit date and is superseded only regarding the self-addressed app test; its statement that no CRM account was modified and that four synthetic lead rows remained is unchanged.

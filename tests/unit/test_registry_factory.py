@@ -1,6 +1,7 @@
 from workflow_automation.contracts import ExecutionContext, RunMode
 from workflow_automation.models import ModuleInstance
 from workflow_automation.modules.processing.validate import Validate
+from workflow_automation.modules.output.gmail_send import GmailSend
 from workflow_automation.registry_factory import build_registry
 
 
@@ -45,3 +46,13 @@ def test_ghl_instance_is_bound_only_when_location_is_configured(monkeypatch):
         ExecutionContext(workflow_id="ghl_test", mode=RunMode.DRY_RUN),
     )
     assert result.business_result["state"] == "PREVIEWED"
+
+
+def test_gmail_send_instance_reuses_configured_postgres_outbox():
+    registry = build_registry()
+    instance = registry.instances["portfolio.gmail_send"]
+    module = registry.instance_modules[instance.instance_id]
+    assert isinstance(module, GmailSend)
+    assert module.store is registry.instance_modules["portfolio.notify"].store
+    assert instance.config["storage_instance_id"] == "portfolio.postgres_store"
+    assert "lawnguyenit@gmail.com" not in str(instance.model_dump())

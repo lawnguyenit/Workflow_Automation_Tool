@@ -19,6 +19,7 @@ from workflow_automation.modules.crm.ghl_upsert_contact import GHLUpsertContact
 from workflow_automation.modules.crm.ghl_upsert_opportunity import GHLUpsertOpportunity
 from workflow_automation.modules.input.email_ingest import EmailIngest
 from workflow_automation.modules.output.notify import NotifySend
+from workflow_automation.modules.output.gmail_send import GmailSend
 from workflow_automation.modules.processing.lead_intake import LeadIntake
 from workflow_automation.modules.processing.lead_qualify import LeadQualify
 from workflow_automation.modules.processing.document_extract import DocumentExtract
@@ -98,6 +99,16 @@ def build_registry(additional_module_instances=None) -> FrameworkRegistry:
             if store is None:
                 raise ValueError(f"Notification instance {item.instance_id} references unavailable storage instance {store_instance_id}")
             module = NotifySend(store=store, timeout_seconds=config.get("timeout_seconds", 10))
+        elif item.module == "gmail.send":
+            store_instance_id = config.get("storage_instance_id", "portfolio.postgres_store")
+            store = stores.get(store_instance_id)
+            if store is None:
+                raise ValueError(f"Gmail instance {item.instance_id} references unavailable storage instance {store_instance_id}")
+            module = GmailSend(
+                store=store,
+                account_scope=config.get("account_scope", "default-gmail"),
+                timeout_seconds=config.get("timeout_seconds", 15),
+            )
         elif item.module == "lead.intake":
             module = LeadIntake()
         elif item.module == "lead.qualify":

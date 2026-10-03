@@ -44,7 +44,7 @@ The reusable `crm.ghl_upsert_contact` and `crm.ghl_upsert_opportunity` adapters 
 
 - `lead.intake`: platform-neutral normalization and review-flag behavior.
 - `lead.store`: local PostgreSQL event persistence and event-key idempotency.
-- `lead.qualify` is implemented as a configurable LLM/review module; its OpenAI path remains unverified without a separately provisioned API credential. Google Forms/Sheets, email delivery, opportunity updates, and follow-up suppression still need separate modules.
+- `lead.qualify` is implemented as a configurable LLM/review module; its OpenAI path remains unverified without a separately provisioned API credential. Reusable Gmail send and GHL opportunity modules now exist but are not composed because sender OAuth, GHL, and owner-approved follow-up/suppression policies are unavailable. Google Forms/Sheets response ingestion also remains unimplemented.
 
 ## Local manual run
 

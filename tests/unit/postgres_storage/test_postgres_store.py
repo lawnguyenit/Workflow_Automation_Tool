@@ -233,6 +233,21 @@ def test_notification_claim_is_conditional_and_only_one_worker_succeeds():
     assert already_claimed is False
 
 
+def test_sent_notification_payload_is_redacted_but_fingerprint_is_preserved():
+    connection = FakeConnection(rows=[(71,)])
+    store = PostgresStore(lambda **_: connection)
+    assert store.redact_sent_notification("71") is True
+    sql, params = connection.cursor_instance.executed[0]
+    assert "SET payload = '{}'::jsonb" in sql
+    assert "WHERE id = %s AND state = 'SENT'" in sql
+    assert params == (71,)
+
+
+def test_notification_payload_redaction_refuses_non_sent_row():
+    connection = FakeConnection(rows=[None])
+    assert PostgresStore(lambda **_: connection).redact_sent_notification("71") is False
+
+
 def test_notification_key_reuse_with_changed_payload_is_rejected():
     connection = FakeConnection(rows=[None, (71, "PENDING", "#finance", "old-fingerprint")])
     try:

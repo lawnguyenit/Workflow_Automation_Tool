@@ -74,6 +74,12 @@ _CLAIM_NOTIFICATION_SQL = """
     WHERE id = %s AND state = 'PENDING'
     RETURNING id, state, attempt_count
 """
+_REDACT_NOTIFICATION_SQL = """
+    UPDATE notification_outbox
+    SET payload = '{}'::jsonb, updated_at = now()
+    WHERE id = %s AND state = 'SENT'
+    RETURNING id
+"""
 _NOTIFICATION_STATES = {
     "PENDING",
     "SENDING",
@@ -423,6 +429,33 @@ class PostgresStore:
             raise NotificationOutboxError(
                 "OUTBOX_CLAIM_OUTCOME_UNKNOWN",
                 "PostgreSQL did not confirm the notification claim.",
+                Retryability.UNKNOWN,
+            ) from None
+
+    def redact_sent_notification(self, notification_id: str | int) -> bool:
+        """Clear stored recipient/body after confirmed delivery, retaining the fingerprint."""
+        try:
+            numeric_id = int(notification_id)
+            if numeric_id < 1:
+                raise ValueError
+        except (ValueError, TypeError):
+            raise ValueError("notification_id must be a positive database ID.") from None
+        connection, connect_args = self._connect()
+        try:
+            with connection(**connect_args) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(_REDACT_NOTIFICATION_SQL, (numeric_id,))
+                    return cursor.fetchone() is not None
+        except (psycopg.OperationalError, psycopg.errors.SerializationFailure, psycopg.errors.DeadlockDetected):
+            raise NotificationOutboxError(
+                "OUTBOX_TEMPORARY_FAILURE",
+                "PostgreSQL could not redact the delivered notification payload.",
+                Retryability.RETRYABLE,
+            ) from None
+        except Exception:
+            raise NotificationOutboxError(
+                "OUTBOX_REDACTION_OUTCOME_UNKNOWN",
+                "PostgreSQL did not confirm notification payload redaction.",
                 Retryability.UNKNOWN,
             ) from None
 

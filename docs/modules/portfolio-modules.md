@@ -57,6 +57,12 @@ Every result includes `module_id`, contract version, `SUCCESS` / `PARTIAL` / `FA
 - **Security/limits:** only HTTPS `hooks.slack.com` webhook URLs are accepted. No OAuth, arbitrary URL, or dynamic destination is supported. Keep webhook credentials outside source and logs.
 - **Unverified:** live Slack behavior, rate limiting, provider-side duplicate semantics, and user acceptance of the notification contents.
 
+## Output: `gmail.send` (`modules/output/gmail_send.py`)
+
+- **Purpose:** Send one plain-text email through Gmail API v1 with a PostgreSQL-backed idempotency outbox.
+- **Contract and recovery:** See [`gmail-send.md`](gmail-send.md) for exact input/output, key scope, concurrency behavior, rate-limit handling, unknown-outcome reconciliation, and PII retention.
+- **Unverified:** The module's local OAuth token and Gmail API path, n8n credential wiring, sender policy, approved lead email text, and follow-up suppression. A self-test through the connected Gmail app verifies only that separate account connection.
+
 ## Execution/deployment: API, Docker Compose and n8n
 
 - Python runner and HTTP API expose catalog, module instance, workflow definition, and workflow instance routes. The n8n template is a manual trigger with six HTTP module-instance nodes and explicit `SUCCESS` gates; n8n composes the modules for this demo. The aggregate workflow endpoint is also available for API-driven execution through the Python runner.

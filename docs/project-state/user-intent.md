@@ -22,7 +22,7 @@
 - There was no existing lead form; the user authorized creating one. A private Google Form draft named `Lead Intake Lab - Test Only` and its linked response spreadsheet now exist. The form is unpublished and has zero responses. It is explicitly labeled for synthetic data and not public lead collection.
 - The user has no known public HTTPS endpoint. VPS `103.178.234.213:2786` hosts an online game; do not connect to, probe, reconfigure, or deploy on it.
 - The user has ChatGPT Plus but no OpenAI API account/key. Keep paid API calls disabled unless the user later provisions a separate API credential directly in a secure UI.
-- The user permits a single test email only if it goes to an address they control and affects no one else. Do not send third-party messages. No message has been sent so far.
+- The user permitted one test email only to an address they control and affecting no one else. On 2026-10-03, one plain-text test was sent through the connected Gmail app to `lawnguyenit@gmail.com` and verified in SENT. Do not send third-party messages under this permission.
 - Use synthetic-only data for current local implementation. Do not publish the form or expose a public callback/tunnel without separate explicit instruction. Do not run live prospect data until purpose, audience/jurisdictions, notice/consent, provider/hosting, retention, and follow-up purpose/content have been established.
 
 ## Assumptions to revisit

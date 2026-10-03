@@ -9,9 +9,22 @@ def test_catalog_and_health_are_available():
     catalog = client.get("/v1/catalog").json()
     assert {module["module_id"] for module in catalog["modules"]} == {
         "email.ingest", "document.extract", "llm.structured_extract", "data.validate",
-        "storage.record", "notify.send", "lead.intake", "lead.store",
+        "storage.record", "notify.send", "gmail.send", "lead.intake", "lead.store",
         "lead.qualify", "crm.ghl_upsert_contact", "crm.ghl_upsert_opportunity",
     }
+
+
+def test_gmail_send_instance_is_previewable_without_credentials_or_side_effects():
+    client = TestClient(create_app())
+    response = client.post("/v1/instances/portfolio.gmail_send/runs", json={
+        "payload": {"idempotency_key": "synthetic-event:ack", "to": "person@example.invalid",
+                    "subject": "Synthetic test", "text_body": "No real email is sent in DRY_RUN."},
+    })
+    assert response.status_code == 200
+    assert response.json()["business_result"] == {
+        "state": "PREVIEWED", "message_id": None, "duplicate": False, "side_effect": False,
+    }
+    assert "person@example.invalid" not in response.text
 
 
 def test_ghl_module_endpoint_is_exposed_without_leaking_runtime_token(monkeypatch):
