@@ -1,0 +1,89 @@
+{
+  "name": "Lead Management — Google Form Responses (private local)",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "triggerOAuth2",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_PRIVATE_RESPONSE_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "REPLACE_WITH_RESPONSE_TAB_ID",
+          "mode": "id"
+        },
+        "event": "anyUpdate",
+        "includeInOutput": "new",
+        "options": {}
+      },
+      "id": "d237dc88-63b0-4e46-b9ec-9800d6f76612",
+      "name": "Google Form response changes",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "aa85183e-3c66-4ac2-8fb8-32dbe0605983",
+              "leftValue": "={{ $json.change_type }}",
+              "rightValue": "added",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e81a3ba2-d3c9-41b3-9f57-2c044e45c316",
+      "name": "Only new response rows",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/v1/workflow-instances/portfolio.lead_management_google_form/runs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { payload: { row_number: Number($json.row_number), row: $json, change_type: $json.change_type }, context: { workflow_id: 'lead_management_google_form', attempt: 1, mode: 'DRY_RUN' } } }}",
+        "options": {}
+      },
+      "id": "f5587624-39d5-4b1a-87f2-6c1cd65c7ec1",
+      "name": "Preview lead intake",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, 220]
+    }
+  ],
+  "connections": {
+    "Google Form response changes": {
+      "main": [[{"node": "Only new response rows", "type": "main", "index": 0}]]
+    },
+    "Only new response rows": {
+      "main": [[{"node": "Preview lead intake", "type": "main", "index": 0}], []]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none"
+  },
+  "meta": {"templateCredsSetupCompleted": false},
+  "tags": []
+}

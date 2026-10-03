@@ -2,6 +2,7 @@ from workflow_automation.contracts import ExecutionContext, RunMode
 from workflow_automation.models import ModuleInstance
 from workflow_automation.modules.processing.validate import Validate
 from workflow_automation.modules.output.gmail_send import GmailSend
+from workflow_automation.modules.input.google_form_response import GoogleFormResponseRow
 from workflow_automation.registry_factory import build_registry
 
 
@@ -56,3 +57,17 @@ def test_gmail_send_instance_reuses_configured_postgres_outbox():
     assert module.store is registry.instance_modules["portfolio.notify"].store
     assert instance.config["storage_instance_id"] == "portfolio.postgres_store"
     assert "lawnguyenit@gmail.com" not in str(instance.model_dump())
+
+
+def test_google_form_mapper_uses_local_sheet_identity_and_keeps_ids_out_of_catalog(monkeypatch):
+    spreadsheet_id = "syntheticSpreadsheet123"
+    monkeypatch.setenv("GOOGLE_FORM_SPREADSHEET_ID", spreadsheet_id)
+    monkeypatch.setenv("GOOGLE_FORM_SHEET_ID", "99017")
+    registry = build_registry()
+    instance = registry.instances["portfolio.google_form_response_map"]
+    module = registry.instance_modules[instance.instance_id]
+    assert isinstance(module, GoogleFormResponseRow)
+    assert module.spreadsheet_id == spreadsheet_id
+    assert module.sheet_id == 99017
+    assert registry.workflow_instances["portfolio.lead_management_google_form"].workflow_definition_id == "lead_management_google_form"
+    assert "GOOGLE_FORM_SPREADSHEET_ID" not in str(instance.model_dump())

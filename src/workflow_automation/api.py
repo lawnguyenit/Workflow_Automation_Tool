@@ -39,11 +39,14 @@ def _public_workflow_result(result: dict[str, Any]) -> dict[str, Any]:
         projected = dict(step_result)
         if step_id in {"email", "document"}:
             projected["business_result"] = {}
-        elif step_id in {"intake", "qualify"}:
+        elif step_id in {"map", "intake", "qualify"}:
             lead = projected.get("business_result", {}).get("lead")
             projected["business_result"] = {
-                "qualification": lead.get("qualification", {}) if isinstance(lead, dict) else {},
-                "prompt_version": projected.get("business_result", {}).get("prompt_version"),
+                **({"qualification": lead.get("qualification", {})}
+                   if step_id != "map" and isinstance(lead, dict) else {}),
+                **({"prompt_version": projected.get("business_result", {}).get("prompt_version")}
+                   if step_id == "qualify" else {}),
+                **({"mapped": True} if step_id == "map" and isinstance(lead, dict) else {}),
             }
         public_steps[step_id] = projected
     public_result["steps"] = public_steps
@@ -65,7 +68,7 @@ class WorkflowRunRequest(BaseModel):
 def create_app() -> FastAPI:
     registry = build_registry()
     runner = WorkflowRunner(registry)
-    app = FastAPI(title="Workflow Automation Module API", version="0.6.0")
+    app = FastAPI(title="Workflow Automation Module API", version="0.7.0")
     app.state.registry = registry
     app.state.runner = runner
 
@@ -110,12 +113,15 @@ def create_app() -> FastAPI:
         logger.info("Module run finished instance_id=%s run_id=%s status=%s", instance_id,
                     context.run_id, result.status.value)
         public_result = result.model_dump(mode="json")
-        if instance.module in {"lead.intake", "lead.qualify"}:
+        if instance.module in {"lead.intake", "lead.qualify", "source.google_form_response"}:
             lead = public_result.get("business_result", {}).get("lead")
-            public_result["business_result"] = {
-                "qualification": lead.get("qualification", {}) if isinstance(lead, dict) else {},
-                "prompt_version": public_result.get("business_result", {}).get("prompt_version"),
-            }
+            if instance.module == "source.google_form_response":
+                public_result["business_result"] = {"mapped": isinstance(lead, dict)}
+            else:
+                public_result["business_result"] = {
+                    "qualification": lead.get("qualification", {}) if isinstance(lead, dict) else {},
+                    "prompt_version": public_result.get("business_result", {}).get("prompt_version"),
+                }
         return public_result
 
     @app.post("/v1/workflows/{workflow_id}/runs")
@@ -128,7 +134,7 @@ def create_app() -> FastAPI:
         if len(matching_instances) != 1:
             raise HTTPException(status_code=409, detail="Workflow must have exactly one default instance for this route")
         payload = request.payload
-        if workflow_id == "lead_management_intake":
+        if workflow_id in {"lead_management_intake", "lead_management_google_form"}:
             payload.setdefault("criteria", None)
             payload.setdefault("mock_qualification", None)
             payload.setdefault("replay_qualification", None)
@@ -161,7 +167,7 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="Unknown workflow instance")
         workflow_id = instance.workflow_definition_id
         payload = request.payload
-        if workflow_id == "lead_management_intake":
+        if workflow_id in {"lead_management_intake", "lead_management_google_form"}:
             payload.setdefault("criteria", None)
             payload.setdefault("mock_qualification", None)
             payload.setdefault("replay_qualification", None)

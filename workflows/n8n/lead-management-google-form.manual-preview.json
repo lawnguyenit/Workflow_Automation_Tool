@@ -1,0 +1,41 @@
+{
+  "name": "Lead Management — Google Form Shape (synthetic preview)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "34ab6ab9-6bf7-4f63-a335-83be20b84418",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/v1/workflow-instances/portfolio.lead_management_google_form/runs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { payload: { row_number: 2, change_type: 'added', row: { 'Dấu thời gian': '2026-10-03 10:00:00', 'Tên đầy đủ': 'Taylor Example', 'Email address': 'taylor@example.invalid', 'Phone (optional)': '+15550102030', 'Service requested': 'Workflow automation', 'Describe your request': 'Synthetic n8n preview only.', row_number: 2, change_type: 'added' } }, context: { workflow_id: 'lead_management_google_form', attempt: 1, mode: 'DRY_RUN' } } }}",
+        "options": {}
+      },
+      "id": "df4fef30-7a63-4934-a597-9abc5cf73b91",
+      "name": "Preview Google Form-shaped lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{"node": "Preview Google Form-shaped lead", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none"
+  },
+  "meta": {"templateCredsSetupCompleted": true},
+  "tags": []
+}

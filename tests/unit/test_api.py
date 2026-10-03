@@ -10,7 +10,8 @@ def test_catalog_and_health_are_available():
     assert {module["module_id"] for module in catalog["modules"]} == {
         "email.ingest", "document.extract", "llm.structured_extract", "data.validate",
         "storage.record", "notify.send", "gmail.send", "lead.intake", "lead.store",
-        "lead.qualify", "crm.ghl_upsert_contact", "crm.ghl_upsert_opportunity",
+        "lead.qualify", "source.google_form_response", "crm.ghl_upsert_contact",
+        "crm.ghl_upsert_opportunity",
     }
 
 
@@ -25,6 +26,58 @@ def test_gmail_send_instance_is_previewable_without_credentials_or_side_effects(
         "state": "PREVIEWED", "message_id": None, "duplicate": False, "side_effect": False,
     }
     assert "person@example.invalid" not in response.text
+
+
+def test_google_form_instance_runs_mapped_lead_graph_and_redacts_source_pii(monkeypatch):
+    monkeypatch.setenv("GOOGLE_FORM_SPREADSHEET_ID", "syntheticSpreadsheet123")
+    monkeypatch.setenv("GOOGLE_FORM_SHEET_ID", "99017")
+    client = TestClient(create_app())
+    response = client.post("/v1/workflow-instances/portfolio.lead_management_google_form/runs", json={
+        "payload": {
+            "row_number": 2,
+            "change_type": "added",
+            "row": {
+                "Dấu thời gian": "2026-10-03 10:00:00",
+                "Tên đầy đủ": "Taylor Example",
+                "Email address": "taylor@example.invalid",
+                "Phone (optional)": "+15550102030",
+                "Service requested": "Workflow automation",
+                "Describe your request": "Synthetic test request.",
+                "row_number": 2,
+                "change_type": "added",
+            },
+        },
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert body["context"]["mode"] == "DRY_RUN"
+    assert body["steps"]["map"]["business_result"] == {"mapped": True}
+    assert body["steps"]["intake"]["business_result"]["qualification"]["status"] == "REVIEW_REQUIRED"
+    assert body["steps"]["store"]["business_result"]["state"] == "PREVIEWED"
+    assert "Taylor Example" not in response.text
+    assert "taylor@example.invalid" not in response.text
+    assert "Synthetic test request" not in response.text
+
+
+def test_google_form_mapper_endpoint_redacts_pii(monkeypatch):
+    monkeypatch.setenv("GOOGLE_FORM_SPREADSHEET_ID", "syntheticSpreadsheet123")
+    monkeypatch.setenv("GOOGLE_FORM_SHEET_ID", "99017")
+    client = TestClient(create_app())
+    response = client.post("/v1/instances/portfolio.google_form_response_map/runs", json={
+        "payload": {
+            "row_number": 2,
+            "change_type": "added",
+            "row": {
+                "Tên đầy đủ": "Taylor Example", "Email address": "taylor@example.invalid",
+                "Phone (optional)": "+15550102030", "Service requested": "Automation",
+                "Describe your request": "Synthetic test.",
+            },
+        },
+    })
+    assert response.status_code == 200
+    assert response.json()["business_result"] == {"mapped": True}
+    assert "Taylor Example" not in response.text
+    assert "taylor@example.invalid" not in response.text
 
 
 def test_ghl_module_endpoint_is_exposed_without_leaking_runtime_token(monkeypatch):

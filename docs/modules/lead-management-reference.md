@@ -1,11 +1,12 @@
-# Lead management reference instance (v1)
+# Lead management reference instance (v2)
 
 This is a private, synthetic/local reference workflow inspired by the supplied Upwork brief. It is not a completed GHL delivery.
 
 ## Current graph
 
 ```text
-local webhook payload
+Google Sheets Trigger `anyUpdate` (`change_type == added` only)
+  → source.google_form_response: map one row using exact configured headers and row number
   → lead.intake: trim, normalize email/phone, enforce bounded field sizes,
     flag missing/invalid fields and fingerprint payload
   → lead.qualify: require an explicit rubric and accepted classes; use a model
@@ -14,6 +15,8 @@ local webhook payload
 ```
 
 The current portfolio path does not call a live LLM, create a CRM contact/opportunity, or send a message. No qualification rubric, GHL test Location, or OpenAI API key is available. It therefore preserves the request and marks it for human review rather than guessing a sales class or summary. A synthetic rubric/fixture can exercise the classification composition without a paid provider call.
+
+The existing manual/local instance still accepts a canonical lead object. A second instance, `portfolio.lead_management_google_form`, accepts a new row from the private response Sheet and maps it before the same downstream pipeline. The response Sheet's metadata and headers were read through the connected Google Drive/Sheets account; it currently has only the header row. Its account-specific IDs are in ignored local `.env`, not source control. See [Google Form row adapter](google-form-response.md).
 
 The reusable `crm.ghl_upsert_contact` and `crm.ghl_upsert_opportunity` adapters are implemented separately and synthetic-test verified. They are not composed into this portfolio workflow because the GHL account, Location, contact duplicate policy, pipeline/stage IDs, and field mapping are not configured. See [GHL contact upsert](ghl-contact-upsert.md) and [GHL opportunity upsert](ghl-opportunity-upsert.md).
 
@@ -37,14 +40,15 @@ The reusable `crm.ghl_upsert_contact` and `crm.ghl_upsert_opportunity` adapters 
 - Qualification currently has no durable cross-process idempotency ledger, cost ceiling, or cache. Replaying an event in REAL mode can trigger another billable call. Do not use real data or unrestricted retries until this is addressed.
 - Intake module responses expose the review status/reasons but suppress name, email, phone, and enquiry text. The database retains the input record and therefore still requires access controls and synthetic-only use for this reference.
 - No reply/book/opt-out/manual-pause event source or follow-up suppression scheduler is wired.
-- The Google Form draft is unpublished; the local services bind only to loopback. No external endpoint is exposed. The user's VPS is explicitly out of scope.
+- The Google Form is unpublished; the Google Sheets trigger export is inactive and has placeholder IDs and no credential. Its preview request uses `DRY_RUN`. The local services bind only to loopback. No external endpoint is exposed. The user's VPS is explicitly out of scope.
 - This does not establish privacy/legal readiness for real prospect data. Keep current runs synthetic.
 
 ## Module boundaries
 
+- `source.google_form_response`: deterministic adapter from one n8n Google Sheets Trigger row to the source-event lead contract; no Google OAuth is held by the API.
 - `lead.intake`: platform-neutral normalization and review-flag behavior.
 - `lead.store`: local PostgreSQL event persistence and event-key idempotency.
-- `lead.qualify` is implemented as a configurable LLM/review module; its OpenAI path remains unverified without a separately provisioned API credential. Reusable Gmail send and GHL opportunity modules now exist but are not composed because sender OAuth, GHL, and owner-approved follow-up/suppression policies are unavailable. Google Forms/Sheets response ingestion also remains unimplemented.
+- `lead.qualify` is implemented as a configurable LLM/review module; its OpenAI path remains unverified without a separately provisioned API credential. Reusable Gmail send and GHL opportunity modules now exist but are not composed because sender OAuth, GHL, and owner-approved follow-up/suppression policies are unavailable. The Google Form row-mapping stage is implemented; the native Google Sheets Trigger still needs an n8n OAuth credential, an import, and a live event check.
 
 ## Local manual run
 

@@ -4,6 +4,8 @@ import os
 
 from workflow_automation.definitions import (
     EXECUTOR_DEFINITIONS,
+    LEAD_GOOGLE_FORM_WORKFLOW,
+    LEAD_GOOGLE_FORM_WORKFLOW_INSTANCE,
     LEAD_MANAGEMENT_WORKFLOW,
     LEAD_MANAGEMENT_WORKFLOW_INSTANCE,
     MODULE_DEFINITIONS,
@@ -18,6 +20,7 @@ from workflow_automation.models import ModuleInstance
 from workflow_automation.modules.crm.ghl_upsert_contact import GHLUpsertContact
 from workflow_automation.modules.crm.ghl_upsert_opportunity import GHLUpsertOpportunity
 from workflow_automation.modules.input.email_ingest import EmailIngest
+from workflow_automation.modules.input.google_form_response import GoogleFormResponseRow
 from workflow_automation.modules.output.notify import NotifySend
 from workflow_automation.modules.output.gmail_send import GmailSend
 from workflow_automation.modules.processing.lead_intake import LeadIntake
@@ -70,6 +73,13 @@ def build_registry(additional_module_instances=None) -> FrameworkRegistry:
                 max_attachment_bytes=config.get("max_attachment_bytes", 10 * 1024 * 1024),
                 max_total_attachment_bytes=config.get("max_total_attachment_bytes", 25 * 1024 * 1024),
                 timeout_seconds=config.get("timeout_seconds", 15),
+            )
+        elif item.module == "source.google_form_response":
+            module = GoogleFormResponseRow(
+                spreadsheet_id=os.getenv("GOOGLE_FORM_SPREADSHEET_ID") or config.get("spreadsheet_id"),
+                sheet_id=os.getenv("GOOGLE_FORM_SHEET_ID") or config.get("sheet_id"),
+                source_account=config.get("source_account", "portfolio-lead-form"),
+                header_map=config.get("header_map"),
             )
         elif item.module == "document.extract":
             module = DocumentExtract(
@@ -137,4 +147,6 @@ def build_registry(additional_module_instances=None) -> FrameworkRegistry:
     registry.add_workflow_instance(PORTFOLIO_WORKFLOW_INSTANCE)
     registry.add_workflow(LEAD_MANAGEMENT_WORKFLOW)
     registry.add_workflow_instance(LEAD_MANAGEMENT_WORKFLOW_INSTANCE)
+    registry.add_workflow(LEAD_GOOGLE_FORM_WORKFLOW)
+    registry.add_workflow_instance(LEAD_GOOGLE_FORM_WORKFLOW_INSTANCE)
     return registry
