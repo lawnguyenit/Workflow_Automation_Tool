@@ -130,4 +130,5 @@ post_audit_implementation_evidence:
     - "Connected Drive folder listing found the private test Form and linked response Sheet; the Form ID is intentionally not recorded in this repository."
     - "The owner-signed-in Form editor showed five question titles matching the mapper exactly: Tên đầy đủ, Email address, Phone (optional), Service requested, and Describe your request."
     - "The Form remains unpublished and has zero responses. Drive content fetch returned HTTP 403; no Forms API request was made."
+    - "The currently selected Google Cloud project showed the Google Forms API disabled and Google Auth Platform not configured. The n8n credential list showed no saved credentials. No cloud or credential changes were made."
   effect_on_disposition: "No change. Form UI title matching narrows mapping uncertainty but does not prove Forms API OAuth, question IDs, poller execution, or the full brief."
