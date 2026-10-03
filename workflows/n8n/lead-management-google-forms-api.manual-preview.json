@@ -1,5 +1,5 @@
 {
-  "name": "Lead Management — Google Forms API shape (synthetic preview)",
+  "name": "Lead Management - Google Forms synthetic DRY_RUN preview",
   "nodes": [
     {
       "parameters": {},
@@ -29,7 +29,7 @@
     "Manual Trigger": {"main": [[{"node": "Preview synthetic Form response", "type": "main", "index": 0}]]}
   },
   "active": false,
-  "settings": {"executionOrder": "v1", "saveDataErrorExecution": "none", "saveDataSuccessExecution": "none"},
+  "settings": {"executionOrder": "v1", "saveDataErrorExecution": "none", "saveDataSuccessExecution": "none", "saveManualExecutions": false},
   "meta": {"templateCredsSetupCompleted": true},
   "tags": []
 }

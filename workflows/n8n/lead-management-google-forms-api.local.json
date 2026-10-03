@@ -139,7 +139,7 @@
     "Run local lead workflow": {"main": [[{"node": "Advance cursor after successful storage", "type": "main", "index": 0}]]}
   },
   "active": false,
-  "settings": {"executionOrder": "v1", "saveDataErrorExecution": "none", "saveDataSuccessExecution": "none"},
+  "settings": {"executionOrder": "v1", "saveDataErrorExecution": "none", "saveDataSuccessExecution": "none", "saveManualExecutions": false},
   "meta": {"templateCredsSetupCompleted": false},
   "tags": []
 }

@@ -13,6 +13,7 @@ def test_polling_export_is_inactive_read_only_paginated_and_checkpointed_after_s
     assert workflow["active"] is False
     assert workflow["settings"]["saveDataSuccessExecution"] == "none"
     assert workflow["settings"]["saveDataErrorExecution"] == "none"
+    assert workflow["settings"]["saveManualExecutions"] is False
     assert "credentials" not in json.dumps(workflow)
     assert "REPLACE_WITH_PRIVATE_GOOGLE_FORM_ID" in nodes["Read cursor and form config"]["parameters"]["jsCode"]
     assert "forms.googleapis.com/v1/forms/" in nodes["Read Form question schema"]["parameters"]["url"]
@@ -36,6 +37,9 @@ def test_manual_forms_api_preview_is_synthetic_and_does_not_need_google_oauth():
     nodes = {node["name"]: node for node in workflow["nodes"]}
     request = nodes["Preview synthetic Form response"]
     assert workflow["active"] is False
+    assert workflow["settings"]["saveDataSuccessExecution"] == "none"
+    assert workflow["settings"]["saveDataErrorExecution"] == "none"
+    assert workflow["settings"]["saveManualExecutions"] is False
     assert "credentials" not in json.dumps(workflow)
     body = request["parameters"]["jsonBody"]
     assert "syntheticGoogleForm123" in body
