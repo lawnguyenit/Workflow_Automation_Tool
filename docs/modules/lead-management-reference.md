@@ -7,11 +7,13 @@ This is a private, synthetic/local reference workflow inspired by the supplied U
 ```text
 local webhook payload
   → lead.intake: trim, normalize email/phone, enforce bounded field sizes,
-    flag missing/invalid fields, fingerprint payload, set REVIEW_REQUIRED
+    flag missing/invalid fields and fingerprint payload
+  → lead.qualify: require an explicit rubric and accepted classes; use a model
+    only in REAL mode, otherwise require a synthetic/replay result or hold review
   → lead.store: PostgreSQL write protected by a unique source event key
 ```
 
-The normal path deliberately does not call a live LLM, create a CRM contact/opportunity, or send a message. No qualification rubric, GHL test Location, or OpenAI API key is available. The workflow therefore preserves the request and marks it for human review rather than guessing a sales class or summary.
+The current portfolio path does not call a live LLM, create a CRM contact/opportunity, or send a message. No qualification rubric, GHL test Location, or OpenAI API key is available. It therefore preserves the request and marks it for human review rather than guessing a sales class or summary. A synthetic rubric/fixture can exercise the classification composition without a paid provider call.
 
 The reusable `crm.ghl_upsert_contact` adapter is now implemented separately and synthetic-test verified. It is not bound to this portfolio workflow because the account, Location, duplicate policy, and field mapping are not configured. See [GHL contact upsert](ghl-contact-upsert.md).
 
@@ -30,7 +32,9 @@ The reusable `crm.ghl_upsert_contact` adapter is now implemented separately and 
 
 - This deduplicates source events only. It does not merge people by email/phone, deduplicate CRM contacts/opportunities, prevent repeated outbound messages, or coordinate a CRM's own duplicate settings.
 - There is no transactional outbox for CRM/email side effects in this lead graph. Do not add remote writes to the same run and assume a database transaction makes them atomic.
-- Qualification status is always `REVIEW_REQUIRED` until the owner approves criteria and a model/provider path. No AI claim or score is emitted.
+- Qualification remains `REVIEW_REQUIRED` when approved criteria, required fields, a valid model/fixture result, or provider configuration is absent. Fixture-backed test runs can emit a synthetic classification; no live model claim is made for this instance.
+- `lead.qualify` accepts a per-run rubric and output labels, validates classifications/confidence/missing data, uses strict structured output for the OpenAI Responses API, and fails closed to review. It sends service/description free text but excludes separately mapped name/email/phone.
+- Qualification currently has no durable cross-process idempotency ledger, cost ceiling, or cache. Replaying an event in REAL mode can trigger another billable call. Do not use real data or unrestricted retries until this is addressed.
 - Intake module responses expose the review status/reasons but suppress name, email, phone, and enquiry text. The database retains the input record and therefore still requires access controls and synthetic-only use for this reference.
 - No reply/book/opt-out/manual-pause event source or follow-up suppression scheduler is wired.
 - The Google Form draft is unpublished; the local services bind only to loopback. No external endpoint is exposed. The user's VPS is explicitly out of scope.
@@ -40,7 +44,7 @@ The reusable `crm.ghl_upsert_contact` adapter is now implemented separately and 
 
 - `lead.intake`: platform-neutral normalization and review-flag behavior.
 - `lead.store`: local PostgreSQL event persistence and event-key idempotency.
-- Future GHL, LLM, Google Forms/Sheets, and email implementations should be separate adapters created when an owned test account and actual configuration/job requirements exist.
+- `lead.qualify` is implemented as a configurable LLM/review module; its OpenAI path remains unverified without a separately provisioned API credential. Google Forms/Sheets, email delivery, opportunity updates, and follow-up suppression still need separate modules.
 
 ## Local manual run
 

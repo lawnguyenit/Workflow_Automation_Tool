@@ -39,10 +39,11 @@ def _public_workflow_result(result: dict[str, Any]) -> dict[str, Any]:
         projected = dict(step_result)
         if step_id in {"email", "document"}:
             projected["business_result"] = {}
-        elif step_id == "intake":
+        elif step_id in {"intake", "qualify"}:
             lead = projected.get("business_result", {}).get("lead")
             projected["business_result"] = {
-                "qualification": lead.get("qualification", {}) if isinstance(lead, dict) else {}
+                "qualification": lead.get("qualification", {}) if isinstance(lead, dict) else {},
+                "prompt_version": projected.get("business_result", {}).get("prompt_version"),
             }
         public_steps[step_id] = projected
     public_result["steps"] = public_steps
@@ -64,7 +65,7 @@ class WorkflowRunRequest(BaseModel):
 def create_app() -> FastAPI:
     registry = build_registry()
     runner = WorkflowRunner(registry)
-    app = FastAPI(title="Workflow Automation Module API", version="0.3.0")
+    app = FastAPI(title="Workflow Automation Module API", version="0.4.0")
     app.state.registry = registry
     app.state.runner = runner
 
@@ -109,10 +110,11 @@ def create_app() -> FastAPI:
         logger.info("Module run finished instance_id=%s run_id=%s status=%s", instance_id,
                     context.run_id, result.status.value)
         public_result = result.model_dump(mode="json")
-        if instance.module == "lead.intake":
+        if instance.module in {"lead.intake", "lead.qualify"}:
             lead = public_result.get("business_result", {}).get("lead")
             public_result["business_result"] = {
-                "qualification": lead.get("qualification", {}) if isinstance(lead, dict) else {}
+                "qualification": lead.get("qualification", {}) if isinstance(lead, dict) else {},
+                "prompt_version": public_result.get("business_result", {}).get("prompt_version"),
             }
         return public_result
 
@@ -126,6 +128,10 @@ def create_app() -> FastAPI:
         if len(matching_instances) != 1:
             raise HTTPException(status_code=409, detail="Workflow must have exactly one default instance for this route")
         payload = request.payload
+        if workflow_id == "lead_management_intake":
+            payload.setdefault("criteria", None)
+            payload.setdefault("mock_qualification", None)
+            payload.setdefault("replay_qualification", None)
         if workflow_id == "intelligent_document_intake":
             payload = {
                 "source": "fixture",
@@ -155,6 +161,10 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="Unknown workflow instance")
         workflow_id = instance.workflow_definition_id
         payload = request.payload
+        if workflow_id == "lead_management_intake":
+            payload.setdefault("criteria", None)
+            payload.setdefault("mock_qualification", None)
+            payload.setdefault("replay_qualification", None)
         if workflow_id == "intelligent_document_intake":
             payload = {
                 "source": "fixture", "fixture_id": "synthetic_invoice", "query": "has:attachment",

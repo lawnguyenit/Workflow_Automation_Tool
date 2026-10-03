@@ -42,6 +42,10 @@ MODULE_DEFINITIONS = [
                      input_schema={"type": "object", "required": ["lead"]},
                      output_schema={"type": "object", "required": ["lead"]},
                      possible_results=["SUCCESS", "PARTIAL", "FAILURE", "REVIEW_REQUIRED"]),
+    ModuleDefinition(module_id="lead.qualify", purpose="Classify lead enquiry content against explicit owner-approved criteria or hold it for human review.",
+                     input_schema={"type": "object", "required": ["lead"]},
+                     output_schema={"type": "object", "required": ["lead", "prompt_version"]},
+                     possible_results=["SUCCESS", "PARTIAL", "FAILURE", "REVIEW_REQUIRED"]),
     ModuleDefinition(module_id="lead.store", purpose="Persist lead events idempotently by source event key in PostgreSQL.",
                      input_schema={"type": "object", "required": ["lead"]},
                      output_schema={"type": "object", "required": ["state", "duplicate"]},
@@ -71,6 +75,9 @@ MODULE_IMPLEMENTATIONS = [
     ModuleImplementation(implementation_id="lead.intake.python.reference.v1", implements="lead.intake", runtime="python",
                          provider="local webhook payload",
                          limitations=["No qualification rubric or live LLM is configured; all leads remain for human review."]),
+    ModuleImplementation(implementation_id="lead.qualify.openai.v1", implements="lead.qualify", runtime="python",
+                         provider="OpenAI Responses API or explicit synthetic/replay fixture",
+                         limitations=["No rubric or API credential is configured in the portfolio instance; real model quality and cost are unverified."]),
     ModuleImplementation(implementation_id="lead.store.postgres.v1", implements="lead.store", runtime="python",
                          provider="PostgreSQL",
                          limitations=["Dedupe scope is source event only; this is not CRM contact or outbound message deduplication."]),
@@ -101,6 +108,8 @@ MODULE_INSTANCES = [
                    config={"provider": "mock"}),
     ModuleInstance(instance_id="portfolio.lead_intake", module="lead.intake",
                    implementation="lead.intake.python.reference.v1", executor_id="python.local"),
+    ModuleInstance(instance_id="portfolio.lead_qualify", module="lead.qualify",
+                   implementation="lead.qualify.openai.v1", executor_id="python.local"),
     ModuleInstance(instance_id="portfolio.lead_store", module="lead.store",
                    implementation="lead.store.postgres.v1", executor_id="python.local"),
 ]
@@ -148,8 +157,14 @@ LEAD_MANAGEMENT_WORKFLOW = WorkflowDefinition(
     steps=[
         {"step_id": "intake", "module_id": "lead.intake",
          "input_mapping": {"lead": "$input.lead"}, "continue_on_partial": True},
+        {"step_id": "qualify", "module_id": "lead.qualify",
+         "depends_on": ["intake"],
+         "input_mapping": {"lead": "intake.lead", "criteria": "$input.criteria",
+                           "mock_result": "$input.mock_qualification",
+                           "replay_result": "$input.replay_qualification"},
+         "continue_on_partial": True},
         {"step_id": "store", "module_id": "lead.store",
-         "depends_on": ["intake"], "input_mapping": {"lead": "intake.lead"}},
+         "depends_on": ["qualify"], "input_mapping": {"lead": "qualify.lead"}},
     ],
 )
 
@@ -157,5 +172,6 @@ LEAD_MANAGEMENT_WORKFLOW_INSTANCE = WorkflowInstance(
     instance_id="portfolio.lead_management_local",
     workflow_definition_id="lead_management_intake",
     description="Private local synthetic reference; CRM, live AI qualification, and email sending are deliberately unbound.",
-    step_bindings={"intake": "portfolio.lead_intake", "store": "portfolio.lead_store"},
+    step_bindings={"intake": "portfolio.lead_intake", "qualify": "portfolio.lead_qualify",
+                   "store": "portfolio.lead_store"},
 )

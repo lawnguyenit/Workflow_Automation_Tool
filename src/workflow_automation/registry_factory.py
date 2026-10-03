@@ -18,6 +18,7 @@ from workflow_automation.modules.crm.ghl_upsert_contact import GHLUpsertContact
 from workflow_automation.modules.input.email_ingest import EmailIngest
 from workflow_automation.modules.output.notify import NotifySend
 from workflow_automation.modules.processing.lead_intake import LeadIntake
+from workflow_automation.modules.processing.lead_qualify import LeadQualify
 from workflow_automation.modules.processing.document_extract import DocumentExtract
 from workflow_automation.modules.processing.llm_structured_extract import LLMStructuredExtract
 from workflow_automation.modules.processing.validate import Validate
@@ -88,6 +89,12 @@ def build_registry(additional_module_instances=None) -> FrameworkRegistry:
             module = NotifySend(store=store, timeout_seconds=config.get("timeout_seconds", 10))
         elif item.module == "lead.intake":
             module = LeadIntake()
+        elif item.module == "lead.qualify":
+            module = LeadQualify(
+                minimum_confidence=config.get("minimum_confidence", 0.75),
+                timeout_seconds=config.get("timeout_seconds", 30),
+                max_input_chars=config.get("max_input_chars", 8_000),
+            )
         elif item.module == "lead.store":
             module = PostgresLeadStore()
         elif item.module == "crm.ghl_upsert_contact":

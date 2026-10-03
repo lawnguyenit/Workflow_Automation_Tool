@@ -1,5 +1,15 @@
 # Independent audit — local lead-management reference
 
+## Follow-up audit update — 2026-10-03
+
+The original audit below captured the pre-0.4.0 state and is retained as historical evidence. The independent re-review of 0.4.0 found the full Upwork brief remains incomplete, while confirming the newly composed `lead.intake → lead.qualify/review → lead.store` path is only locally verified with synthetic fixtures in `DRY_RUN`. The Docker API returned `CLASSIFIED` qualification and `PREVIEWED` storage with synthetic name/email/phone omitted from its aggregate response; this was re-run after the fixes below.
+
+- **Resolved:** a null classification now adds the actionable `unclear_fit` review reason; a dedicated unit test covers it.
+- **Resolved:** removed the duplicate API test function name so pytest collects the intended test definition unambiguously.
+- **Current verification:** 95 tests pass with one Starlette deprecation warning; `compileall`, `git diff --check`, and Docker API rebuild/preview pass.
+- **Still incomplete:** connected form/webhook, GHL opportunity/custom fields/tags, email sequence, reply/booking/opt-out/manual-pause suppression, lead-specific alert/recovery, n8n UI import/runtime, live provider checks, and end-to-end acceptance.
+- **Material risk:** REAL qualification retries can repeat model cost because no durable call ledger/cache/spend ceiling exists; prompt provenance does not yet bind a rubric version/hash.
+
 ## Reviewed scope and authority
 
 - Target: the supplied Upwork brief for form/webhook capture, validation, AI qualification, GHL contact/opportunity updates, follow-up with suppression, failure handling, export/setup documentation, and an end-to-end acceptance run.

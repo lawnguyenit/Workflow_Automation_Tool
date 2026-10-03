@@ -10,7 +10,7 @@ def test_catalog_and_health_are_available():
     assert {module["module_id"] for module in catalog["modules"]} == {
         "email.ingest", "document.extract", "llm.structured_extract", "data.validate",
         "storage.record", "notify.send", "lead.intake", "lead.store",
-        "crm.ghl_upsert_contact",
+        "lead.qualify", "crm.ghl_upsert_contact",
     }
 
 
@@ -75,8 +75,42 @@ def test_lead_workflow_dry_run_is_sanitized_and_review_first():
     body = response.json()
     assert body["status"] == "REVIEW_REQUIRED"
     assert body["steps"]["intake"]["business_result"]["qualification"]["status"] == "REVIEW_REQUIRED"
+    assert body["steps"]["qualify"]["business_result"]["qualification"]["status"] == "REVIEW_REQUIRED"
+    assert body["steps"]["qualify"]["status"] == "PARTIAL"
     assert body["result"]["state"] == "PREVIEWED"
     assert body["steps"]["store"]["status"] == "REVIEW_REQUIRED"
+    assert "Taylor Example" not in response.text
+    assert "taylor@example.invalid" not in response.text
+
+
+def test_lead_workflow_applies_explicit_qualification_fixture_without_provider_side_effects():
+    client = TestClient(create_app())
+    response = client.post("/v1/workflow-instances/portfolio.lead_management_local/runs", json={
+        "payload": {
+            "lead": {
+                "source_system": "test", "source_account": "local", "source_event_id": "test-qualified",
+                "name": "Taylor Example", "email": "taylor@example.invalid", "phone": "",
+                "service_requested": "Automation", "description": "Route web enquiries.",
+            },
+            "criteria": {
+                "rubric": "Classify only fit to the automation service described in the enquiry.",
+                "classifications": [{"name": "qualified", "description": "Fits the offered service."}],
+                "required_fields": ["name", "email", "service_requested", "description"],
+            },
+            "mock_qualification": {
+                "classification": "qualified", "summary": "Wants web enquiry routing.",
+                "confidence": 0.9, "missing_information": [], "reasons": [],
+            },
+        }
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert body["steps"]["qualify"]["status"] == "SUCCESS"
+    assert body["steps"]["qualify"]["business_result"]["qualification"] == {
+        "status": "CLASSIFIED", "reasons": [], "classification": "qualified",
+        "summary": "Wants web enquiry routing.", "model_used": "fixture",
+    }
+    assert body["steps"]["store"]["business_result"]["state"] == "PREVIEWED"
     assert "Taylor Example" not in response.text
     assert "taylor@example.invalid" not in response.text
 
