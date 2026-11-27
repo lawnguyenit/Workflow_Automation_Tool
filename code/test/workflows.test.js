@@ -9,7 +9,8 @@ const { WF, outputs } = require('../tools/build-workflows');
 const ROOT = path.resolve(__dirname, '..', '..');
 const load = (w) => JSON.parse(fs.readFileSync(path.join(ROOT, 'workflows', w.dir, 'workflow.json'), 'utf8'));
 const all = Object.fromEntries(Object.entries(WF).map(([k, w]) => [k, load(w)]));
-const byId = Object.fromEntries(Object.values(all).map((wf) => [wf.id, wf]));
+const byName = Object.fromEntries(Object.values(all).map((wf) => [wf.name, wf]));
+const REF = '@workflow:';
 const realNodes = (wf) => wf.nodes.filter((n) => n.type !== 'n8n-nodes-base.stickyNote');
 
 // Node types and versions confirmed present in n8n 2.49.8 (n8n-nodes-base/dist/nodes).
@@ -30,13 +31,16 @@ const KNOWN = {
   'n8n-nodes-base.stickyNote': [1],
 };
 
-test('committed workflow files match the generator output', () => {
-  for (const [file, content] of outputs()) {
+test('committed workflow files match the generator output (normalized)', (t) => {
+  const files = outputs();
+  if (!files) return t.skip('scripts/lib/normalize.js not found (set N8N_TOOLING_DIR before the tooling merge)');
+  for (const [file, content] of files) {
     assert.equal(fs.readFileSync(file, 'utf8'), content, `${path.relative(ROOT, file)} is stale: run node code/tools/build-workflows.js`);
   }
 });
 
-test('every node uses a known type/version and a descriptive unique name', () => {
+test('every node uses a known type/version and a descriptive unique name; sub names start with "sub: "', () => {
+  for (const key of ['checkDuplicate', 'extract', 'validate', 'store', 'notify']) assert.match(all[key].name, /^sub: /);
   for (const wf of Object.values(all)) {
     const names = wf.nodes.map((n) => n.name);
     assert.equal(new Set(names).size, names.length, `${wf.name}: duplicate node names`);
@@ -61,8 +65,8 @@ test('connections only point at existing nodes', () => {
 test('error workflow is set everywhere except on the error handler itself', () => {
   for (const [key, wf] of Object.entries(all)) {
     if (key === 'errors') assert.equal(wf.settings.errorWorkflow, undefined);
-    else assert.equal(wf.settings.errorWorkflow, WF.errors.id, wf.name);
-    assert.equal(wf.active, false);
+    else assert.equal(wf.settings.errorWorkflow, REF + WF.errors.name, wf.name);
+    assert.ok(wf.active === undefined || wf.active === false);
     assert.equal(wf.settings.executionOrder, 'v1');
   }
   assert.ok(all.errors.nodes.some((n) => n.type === 'n8n-nodes-base.errorTrigger'));
@@ -74,7 +78,7 @@ test('credentials are name placeholders only', () => {
   for (const wf of Object.values(all)) {
     for (const n of wf.nodes) {
       for (const ref of Object.values(n.credentials ?? {})) {
-        assert.match(ref.id, /^REPLACE_[A-Z_]+_CREDENTIAL_ID$/);
+        assert.deepEqual(Object.keys(ref), ['name']);
         assert.ok(['Gmail (secondary account)', 'Gemini API', 'Postgres (local)'].includes(ref.name), ref.name);
       }
     }
@@ -90,14 +94,14 @@ test('each sub-workflow declares typed inputs and each call maps exactly those i
     assert.equal(trigger[0].parameters.inputSource, 'workflowInputs');
     const values = trigger[0].parameters.workflowInputs.values;
     assert.ok(values.length > 0 && values.every((v) => v.name && v.type), all[key].name);
-    declared[all[key].id] = values;
+    declared[all[key].name] = values;
   }
   const calls = Object.values(all).flatMap((wf) => wf.nodes.filter((n) => n.type === 'n8n-nodes-base.executeWorkflow'));
   assert.equal(calls.length, 5);
   for (const call of calls) {
-    const target = call.parameters.workflowId.value;
-    assert.ok(byId[target], `${call.name}: unknown target ${target}`);
-    assert.equal(call.parameters.workflowId.cachedResultName, byId[target].name);
+    assert.ok(call.parameters.workflowId.value.startsWith(REF), call.name);
+    const target = call.parameters.workflowId.value.slice(REF.length);
+    assert.ok(byName[target], `${call.name}: unknown target ${target}`);
     const want = declared[target].map((v) => `${v.name}:${v.type}`).sort();
     const got = call.parameters.workflowInputs.schema.map((s) => `${s.id}:${s.type}`).sort();
     assert.deepEqual(got, want, call.name);
@@ -144,4 +148,19 @@ test('extract-invoice: cap reservation happens before the Gemini call and every 
   const http = all.extract.nodes.find((n) => n.type === 'n8n-nodes-base.httpRequest');
   assert.equal(http.parameters.nodeCredentialType, 'googlePalmApi');
   assert.match(http.parameters.url, /generativelanguage\.googleapis\.com\/v1beta\/models\/.*:generateContent/);
+});
+
+test('notify Compose Code node builds subject and body from issue codes only', () => {
+  const n = all.notify.nodes.find((x) => x.name === 'Compose notification text');
+  const run = new Function('$input', '$execution', n.parameters.jsCode);
+  const out = run({ all: () => [{ json: { notify_to: 'ops@example.invalid', status: 'REVIEW_REQUIRED', filename: 'a.pdf', invoice_number: null, sender: null, amount: null, currency: null, invoice_id: null, issues: ['DAILY_AI_CAP_REACHED', 'EXTRACTION_REQUIRES_REVIEW', 'EXTRACTION_REQUIRES_REVIEW'] } }] }, { id: '7' });
+  assert.equal(out[0].json.subject, 'Invoice needs manual review');
+  assert.match(out[0].json.body, /Issues: DAILY_AI_CAP_REACHED, EXTRACTION_REQUIRES_REVIEW\n/);
+  assert.match(out[0].json.body, /n8n execution: 7/);
+});
+
+test('orchestrator re-attaches the PDF binary from the split node (Crypto hash output has no binary)', () => {
+  const n = all.intake.nodes.find((x) => x.name === 'Attach duplicate result to PDF');
+  assert.match(n.parameters.jsCode, /\$\('Split one item per PDF attachment'\)\.itemMatching\(i\)/);
+  assert.match(n.parameters.jsCode, /binary: split\.binary/);
 });

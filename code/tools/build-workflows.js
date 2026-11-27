@@ -15,17 +15,19 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SRC = path.join(ROOT, 'code', 'src');
 
 // ---------------------------------------------------------------------------
-// Names, ids, credentials. Ids are fixed so Execute Sub-workflow references and
-// settings.errorWorkflow resolve right after `n8n import:workflow` (import keeps ids).
+// Names, folders, credentials. Folder = slug of the name (sub-workflows: "sub: " prefix,
+// folder workflows/sub/<slug>), as required by scripts/n8n-lint.js. The ids below exist only
+// so the raw build can be normalized: the committed files reference workflows by name
+// ("@workflow:<name>") and scripts/n8n-import.js maps names to ids on import.
 // ---------------------------------------------------------------------------
 const WF = {
-  intake: { id: 'wfInvoiceIntake0', name: 'Process invoice emails', dir: 'invoice-intake' },
-  checkDuplicate: { id: 'wfCheckDuplic000', name: 'Check duplicate invoice', dir: 'sub/check-duplicate' },
-  extract: { id: 'wfExtractInvoic0', name: 'Extract invoice fields', dir: 'sub/extract-invoice' },
-  validate: { id: 'wfValidateInvoi0', name: 'Validate invoice', dir: 'sub/validate-invoice' },
-  store: { id: 'wfStoreInvoice00', name: 'Store invoice', dir: 'sub/store-invoice' },
-  notify: { id: 'wfNotifyInvoice0', name: 'Send invoice notification', dir: 'sub/notify' },
-  errors: { id: 'wfErrorHandler00', name: 'Handle workflow errors', dir: 'error-handler' },
+  intake: { id: 'wfInvoiceIntake0', name: 'invoice intake', dir: 'invoice-intake' },
+  checkDuplicate: { id: 'wfCheckDuplic000', name: 'sub: check duplicate', dir: 'sub/check-duplicate' },
+  extract: { id: 'wfExtractInvoic0', name: 'sub: extract invoice', dir: 'sub/extract-invoice' },
+  validate: { id: 'wfValidateInvoi0', name: 'sub: validate invoice', dir: 'sub/validate-invoice' },
+  store: { id: 'wfStoreInvoice00', name: 'sub: store invoice', dir: 'sub/store-invoice' },
+  notify: { id: 'wfNotifyInvoice0', name: 'sub: notify', dir: 'sub/notify' },
+  errors: { id: 'wfErrorHandler00', name: 'error handler', dir: 'error-handler' },
 };
 
 // Credential references by NAME only. The id is a placeholder the tooling replaces on import.
@@ -184,9 +186,10 @@ function workflow(key, nodes, connections, { description, isErrorHandler = false
     saveDataErrorExecution: 'all',
     saveDataSuccessExecution: 'none',
     saveManualExecutions: false,
-    callerPolicy: key === 'intake' || isErrorHandler ? 'workflowsFromSameOwner' : 'workflowsFromAList',
+    // Not 'workflowsFromAList': callerIds hold instance-specific ids that normalization
+    // cannot map by name, so a restricted list would break after import on another instance.
+    callerPolicy: 'workflowsFromSameOwner',
   };
-  if (settings.callerPolicy === 'workflowsFromAList') settings.callerIds = WF.intake.id;
   if (!isErrorHandler) settings.errorWorkflow = WF.errors.id;
   return {
     id: wf.id,
@@ -210,12 +213,12 @@ function buildCheckDuplicate() {
   const c = {};
   const nodes = [
     sticky(k, 'Note: what this does', [
-      '## Check duplicate invoice',
+      '## sub: check duplicate',
       'Input: `message_id`, `attachment_sha256`.',
       'Output: `{ idempotency_key, is_duplicate, existing_invoice_id }`.',
       '',
       'Key = sha256(message id + "\\n" + attachment sha256), see `code/src/duplicate-key.js`.',
-      'Read-only: this workflow never writes. The unique index on `invoices.idempotency_key` is the real guard (see Store invoice).',
+      'Read-only: this workflow never writes. The unique index on `invoices.idempotency_key` is the real guard (see sub: store invoice).',
     ].join('\n'), [-60, -260], 520, 240),
     subTrigger(k, [0, 0], [['message_id', 'string'], ['attachment_sha256', 'string']]),
     codeNode(k, 'Compute duplicate key', [220, 0], embed(['duplicate-key'], `
@@ -253,7 +256,7 @@ const record = emptyRecord(source, errorCode);
 return [{ json: { record, extraction_status: record.status, error_code: errorCode } }];`;
   const nodes = [
     sticky(k, 'Note: what this does', [
-      '## Extract invoice fields',
+      '## sub: extract invoice',
       'Input: `idempotency_key`, `message_id`, `attachment_id`, `filename` + binary `invoice_pdf`.',
       'Output: `{ record, extraction_status, error_code }`; `record` follows `code/src/extraction.js`.',
       '',
@@ -352,8 +355,8 @@ function buildValidate() {
   const c = {};
   const nodes = [
     sticky(k, 'Note: what this does', [
-      '## Validate invoice',
-      'Input: `invoice` (object, the record from Extract invoice fields).',
+      '## sub: validate invoice',
+      'Input: `invoice` (object, the record from sub: extract invoice).',
       'Output: `{ valid, status: VALID|REVIEW_REQUIRED, invoice, issues[] }`.',
       '',
       'Rules: `code/src/validate.js` (ported from the Python `data.validate`). Thresholds are at the top of the Code node.',
@@ -384,7 +387,7 @@ function buildStore() {
   const T = 'When called by another workflow';
   const nodes = [
     sticky(k, 'Note: what this does', [
-      '## Store invoice',
+      '## sub: store invoice',
       'Input: `idempotency_key`, `message_id`, `attachment_id`, `filename`, `invoice` (validated object).',
       'Output: `{ outcome: STORED|DUPLICATE|CONFLICT, invoice_id, reason }`.',
       '',
@@ -435,7 +438,7 @@ function buildNotify() {
   const c = {};
   const nodes = [
     sticky(k, 'Note: what this does', [
-      '## Send invoice notification',
+      '## sub: notify',
       'Input: `status` (STORED|CONFLICT|REVIEW_REQUIRED), `invoice_number`, `sender`, `amount`, `currency`, `invoice_id`, `filename`, `issues` (array).',
       'Output: `{ notified, channel, provider_message_id }`.',
       '',
@@ -477,7 +480,7 @@ return $input.all().map((item) => {
       emailType: 'text',
       message: '={{ $json.body }}',
       options: { appendAttribution: false },
-    }, { credentials: CRED.gmail, webhookId: nodeId(k, 'gmail-webhook') }),
+    }, { credentials: CRED.gmail }),
     setNode(k, 'Return notification result', [880, 0], [
       ['notified', 'boolean', true],
       ['channel', 'string', 'gmail'],
@@ -496,7 +499,7 @@ function buildErrorHandler() {
   const c = {};
   const nodes = [
     sticky(k, 'Note: what this does', [
-      '## Handle workflow errors',
+      '## error handler',
       'Every workflow in this project sets this one as its error workflow.',
       '',
       '1. **Error Trigger** receives workflow + execution metadata.',
@@ -529,7 +532,7 @@ return $input.all().map((item) => ({ json: incidentRow(item.json) }));`)),
         "'Incident row: ' + ($('Write incident row').first().json.id ?? 'not written') }}",
       ].join('\n'),
       options: { appendAttribution: false },
-    }, { credentials: CRED.gmail, webhookId: nodeId(k, 'gmail-webhook') }),
+    }, { credentials: CRED.gmail }),
   ];
   chain(c, 'When any workflow fails', 'Build incident row without PII', 'Write incident row', 'Alert settings', 'Send incident alert email');
   return workflow(k, nodes, c, { description: 'Error workflow: log a PII-free incident row and send one alert email.', isErrorHandler: true });
@@ -545,10 +548,10 @@ function buildIntake() {
   const fromSrc = (field) => `={{ $('${SRC_NODE}').item.json.${field} }}`;
   const nodes = [
     sticky(k, 'Note: overview', [
-      '## Process invoice emails (orchestrator)',
+      '## invoice intake (orchestrator)',
       'Gmail -> one item per PDF -> check duplicate -> extract -> validate -> store -> notify.',
       'This workflow only routes. All rules live in the sub-workflows and `code/src`.',
-      'Errors anywhere go to **Handle workflow errors**.',
+      'Errors anywhere go to **error handler**.',
       'Contracts: `docs/architecture.md`.',
     ].join('\n'), [-80, -460], 560, 220, 6),
     sticky(k, 'Note: 1 intake', '### 1. Intake\nPolls the "Gmail (secondary account)" inbox for new mail with a PDF attachment, splits each PDF into its own item and hashes its bytes.', [-80, -200], 680, 160),
@@ -589,10 +592,12 @@ return out;`),
       ['attachment_sha256', 'string', '={{ $json.attachment_sha256 }}'],
     ]),
     codeNode(k, SRC_NODE, [920, 0], `
-// Plumbing only: the sub-workflow returns new items; put the PDF binary and provenance back.
+// Plumbing only: the sub-workflow returns new items; put provenance + hash back (from the
+// Crypto node) and the PDF binary back (from the split node: the Crypto node drops binary).
 return $input.all().map((item, i) => {
-  const source = $('Hash PDF bytes (SHA-256)').itemMatching(i);
-  return { json: { ...source.json, ...item.json }, binary: source.binary, pairedItem: { item: i } };
+  const hashed = $('Hash PDF bytes (SHA-256)').itemMatching(i);
+  const split = $('Split one item per PDF attachment').itemMatching(i);
+  return { json: { ...hashed.json, ...item.json }, binary: split.binary, pairedItem: { item: i } };
 });`),
     ifNode(k, 'Already stored?', [1140, 0], '={{ $json.is_duplicate }}', IS_TRUE),
     callSub(k, 'Call: Extract invoice fields', [1420, 100], WF.extract, [
@@ -640,7 +645,8 @@ return $input.all().map((item, i) => {
       ['amount', 'string', "={{ $('Call: Extract invoice fields').item.json.record.amount === null ? null : String($('Call: Extract invoice fields').item.json.record.amount) }}"],
       ['currency', 'string', "={{ $('Call: Extract invoice fields').item.json.record.currency }}"],
       ['filename', 'string', fromSrc('filename')],
-      ['issues', 'array', '={{ $json.issues }}'],
+      // Extraction error code first (e.g. DAILY_AI_CAP_REACHED, OCR_REQUIRED), then validation issue codes.
+      ['issues', 'array', "={{ [$('Call: Extract invoice fields').item.json.error_code, ...$json.issues.map((i) => i.code)].filter(Boolean) }}"],
     ]),
     callSub(k, 'Call: Send invoice notification', [2860, 100], WF.notify, [
       ['status', 'string', '={{ $json.status }}'],
@@ -687,31 +693,40 @@ function fileFor(wf) {
   return path.join(ROOT, 'workflows', entry.dir, 'workflow.json');
 }
 
-function serialize(wf) {
-  return `${JSON.stringify(wf, null, 2)}\n`;
-}
-
-function manifest() {
-  return `${JSON.stringify({
-    description: 'Workflows of this project. Import order: error-handler, sub/*, invoice-intake. Ids are fixed in each file.',
-    workflows: Object.values(WF).map((w) => ({ name: w.name, id: w.id, file: `workflows/${w.dir}/workflow.json` })),
-    credentials: Object.values(CRED).map((cred) => {
-      const [type, ref] = Object.entries(cred)[0];
-      return { name: ref.name, type, placeholder_id: ref.id };
-    }),
-  }, null, 2)}\n`;
+// The normalizer belongs to the repo tooling (scripts/lib/normalize.js). Before the tooling
+// branch is merged, point N8N_TOOLING_DIR at a checkout that has it.
+function loadNormalizer() {
+  const candidates = [path.join(ROOT, 'scripts', 'lib')];
+  if (process.env.N8N_TOOLING_DIR) candidates.push(path.join(process.env.N8N_TOOLING_DIR, 'scripts', 'lib'));
+  for (const dir of candidates) {
+    if (fs.existsSync(path.join(dir, 'normalize.js'))) {
+      return { ...require(path.join(dir, 'normalize.js')), ...require(path.join(dir, 'common.js')) };
+    }
+  }
+  return null;
 }
 
 function outputs() {
-  const files = buildAll().map((wf) => [fileFor(wf), serialize(wf)]);
-  files.push([path.join(ROOT, 'workflows', 'manifest.json'), manifest()]);
-  return files;
+  const lib = loadNormalizer();
+  if (!lib) return null;
+  const raws = buildAll();
+  const idToName = lib.buildIdToName(raws);
+  return raws.map((wf) => {
+    const { workflow, warnings } = lib.normalizeWorkflow(wf, { idToName });
+    if (warnings.length) throw new Error(`${wf.name}: ${warnings.join('; ')}`);
+    return [fileFor(wf), lib.stringify(workflow)];
+  });
 }
 
 if (require.main === module) {
   const check = process.argv.includes('--check');
+  const files = outputs();
+  if (!files) {
+    console.error('scripts/lib/normalize.js not found; set N8N_TOOLING_DIR to a checkout with the n8n tooling');
+    process.exit(2);
+  }
   let stale = 0;
-  for (const [file, content] of outputs()) {
+  for (const [file, content] of files) {
     const current = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
     if (current === content) continue;
     if (check) {

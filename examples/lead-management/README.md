@@ -8,11 +8,12 @@ invoice-intake product in `workflows/`.
   HighLevel (GHL) CRM, LLM provider or Gmail sender. One manual `DRY_RUN` preview
   was executed once in a local n8n against the legacy Python API with synthetic data
   (recorded in `docs/project-state/`, not re-run after the move).
-- The HTTP nodes call the legacy Python API in `legacy/python-modules/`; they do not
-  work on their own.
+- The HTTP nodes call the legacy Python API (`http://api:8000`, code in
+  `legacy/python-modules/`). The current compose stack has no `api` service, so these
+  exports do not run on it.
 - `infra/postgres/migrations/` holds the lead-specific tables (leads, qualification
   ledger, follow-up suppression, source-poll checkpoint, GHL ledgers). They are not
-  applied by the main `infra/postgres/init.sql`.
+  applied by `infra/postgres/10-invoice-intake.sql`.
 
 Layout:
 

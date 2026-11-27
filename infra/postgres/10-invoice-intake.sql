@@ -1,6 +1,7 @@
 -- Schema for the n8n invoice-intake workflows (workflows/). Repeatable: safe to run twice.
--- Docker Compose mounts this file as /docker-entrypoint-initdb.d/10-workflow-init.sql, so it
--- runs once, on an empty data volume, in the application database (not the n8n database).
+-- infra/docker-compose.yml mounts this folder into /docker-entrypoint-initdb.d, so files run
+-- once, in name order, on an empty data volume (00-create-n8n-db.sql first). Keep new files at
+-- this level with a numeric prefix; subfolders are ignored by initdb.
 -- The old Python-era schema is in legacy/python-modules/infra/postgres/init.sql.
 BEGIN;
 

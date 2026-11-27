@@ -19,9 +19,10 @@ exports now in `../../examples/lead-management/workflows/`.
 
 - `infra/postgres/init.sql` is the old full schema (invoices, leads, ledgers,
   outbox, incidents). `migrations/003` and `007` belong to it. The main
-  `infra/postgres/init.sql` of the repo no longer contains these tables.
+  `infra/postgres/10-invoice-intake.sql` of the repo no longer contains these tables.
 - `workflows/n8n/intelligent-document-intake.demo.json` is the old n8n demo made of
-  HTTP nodes that call this API in `DRY_RUN`.
+  HTTP nodes that call this API in `DRY_RUN` at `http://api:8000`. The current
+  compose stack has no `api` service, so it only works if you run the API yourself.
 - `fixtures/` is a copy of `../../tests/fixtures/` so the package keeps finding its
   default fixture folder without code changes.
 - `tests/integration/` scripts need Docker Compose and the old schema; they were
