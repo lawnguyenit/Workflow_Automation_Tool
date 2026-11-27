@@ -1,0 +1,60 @@
+name: n8n-checks
+
+on:
+  push:
+    paths: ['workflows/**', 'scripts/**', 'infra/**', 'docker-compose.yml', '.env.example', '.github/workflows/n8n-checks.yml']
+  pull_request:
+    paths: ['workflows/**', 'scripts/**', 'infra/**', 'docker-compose.yml', '.env.example', '.github/workflows/n8n-checks.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    name: static checks (no n8n needed)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Unit tests (normalize, diagrams, lint)
+        run: node --test "scripts/test/*.test.js"
+      - name: JSON valid, placement, node names, sub-workflow inputs, references, secrets
+        run: node scripts/n8n-lint.js --dir workflows
+      - name: Normalized form is stable (re-normalize produces no diff)
+        run: |
+          node scripts/n8n-normalize.js --dir workflows --check
+          node scripts/n8n-normalize.js --dir workflows
+          git diff --exit-code -- workflows
+      - name: Diagrams and READMEs match committed files
+        run: |
+          node scripts/n8n-docs.js --dir workflows --check
+      - name: Compose files are valid and bind to localhost only
+        run: |
+          cp .env.example /tmp/ci.env
+          sed -i 's/=replace.*/=ci-only-placeholder-value-0123456789abcdef/' /tmp/ci.env
+          docker compose --env-file /tmp/ci.env -f infra/docker-compose.yml config -q
+          docker compose --env-file /tmp/ci.env -f infra/docker-compose.yml config | grep -q 'host_ip: 127.0.0.1'
+          ! docker compose --env-file /tmp/ci.env -f infra/docker-compose.yml config | grep -E 'host_ip: (0\.0\.0\.0|"")'
+          ! grep -nE '^\s*image:.*:(latest|stable)\s*$' infra/docker-compose.yml
+      - name: No .env committed
+        run: '! git ls-files | grep -E "(^|/)\.env$"'
+
+  roundtrip:
+    name: import/export round trip on the pinned n8n
+    runs-on: ubuntu-latest
+    needs: static
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24   # n8n 2.x requires Node >= 24
+      - name: Install the n8n version pinned in infra/docker-compose.yml
+        run: |
+          V=$(grep -oE 'n8nio/n8n:[0-9]+\.[0-9]+\.[0-9]+' infra/docker-compose.yml | head -1 | cut -d: -f2)
+          echo "n8n $V"
+          npm install --prefix "$RUNNER_TEMP/n8n" "n8n@$V" --no-audit --no-fund
+          echo "N8N_BIN=$RUNNER_TEMP/n8n/node_modules/.bin/n8n" >> "$GITHUB_ENV"
+      - name: Round trip (import -> export -> normalize == committed; export twice == identical)
+        run: node scripts/roundtrip-check.js --dir workflows
