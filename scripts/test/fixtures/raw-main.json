@@ -1,0 +1,69 @@
+{
+  "updatedAt": "2026-02-02T03:04:05.000Z",
+  "createdAt": "2026-02-01T00:00:00.000Z",
+  "id": "MainIdBBBBBBBBBB2",
+  "name": "Lead intake",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "lead-intake", "options": {} },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "id": "33333333-3333-4333-8333-333333333333",
+      "name": "Receive lead webhook",
+      "webhookId": "99999999-9999-4999-8999-999999999999"
+    },
+    {
+      "parameters": {
+        "workflowId": { "__rl": true, "value": "SubIdAAAAAAAAAAA1", "mode": "list", "cachedResultName": "sub: Normalize Lead" },
+        "workflowInputs": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [240, 0],
+      "id": "44444444-4444-4444-8444-444444444444",
+      "name": "Normalize lead"
+    },
+    {
+      "parameters": {
+        "conditions": { "conditions": [ { "id": "c1", "leftValue": "={{ $json.email }}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } } ] }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [480, 0],
+      "id": "55555555-5555-4555-8555-555555555555",
+      "name": "Has email?"
+    },
+    {
+      "parameters": { "method": "POST", "url": "https://example.com/hook", "authentication": "predefinedCredentialType", "nodeCredentialType": "httpHeaderAuth" },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, -100],
+      "id": "66666666-6666-4666-8666-666666666666",
+      "name": "Post to CRM",
+      "credentials": { "httpHeaderAuth": { "id": "CredIdCCCCCCCCCC3", "name": "CRM header auth" } },
+      "retryOnFail": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": { "content": "Receives leads from the website form and pushes them to the CRM." },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [0, -200],
+      "id": "77777777-7777-4777-8777-777777777777",
+      "name": "Note"
+    }
+  ],
+  "connections": {
+    "Receive lead webhook": { "main": [ [ { "node": "Normalize lead", "type": "main", "index": 0 } ] ] },
+    "Normalize lead": { "main": [ [ { "node": "Has email?", "type": "main", "index": 0 } ] ] },
+    "Has email?": { "main": [ [ { "node": "Post to CRM", "type": "main", "index": 0 } ], [] ] }
+  },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": true },
+  "settings": { "executionOrder": "v1", "errorWorkflow": "SubIdAAAAAAAAAAA1" },
+  "tags": [],
+  "versionId": "22222222-aaaa-bbbb-cccc-000000000002"
+}
