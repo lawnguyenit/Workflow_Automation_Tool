@@ -3,8 +3,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-POLLING_EXPORT = ROOT / "workflows" / "n8n" / "lead-management-google-forms-api.local.json"
-MANUAL_EXPORT = ROOT / "workflows" / "n8n" / "lead-management-google-forms-api.manual-preview.json"
+POLLING_EXPORT = ROOT.parents[1] / "examples" / "lead-management" / "workflows" / "lead-management-google-forms-api.local.json"
+MANUAL_EXPORT = ROOT.parents[1] / "examples" / "lead-management" / "workflows" / "lead-management-google-forms-api.manual-preview.json"
 
 
 def test_polling_export_is_inactive_read_only_paginated_and_lease_checkpointed_after_success():

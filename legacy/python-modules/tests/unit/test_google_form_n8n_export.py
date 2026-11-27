@@ -2,8 +2,8 @@ import json
 from pathlib import Path
 
 
-EXPORT = Path(__file__).resolve().parents[2] / "workflows" / "n8n" / "lead-management-google-form.local.json"
-MANUAL_PREVIEW = Path(__file__).resolve().parents[2] / "workflows" / "n8n" / "lead-management-google-form.manual-preview.json"
+EXPORT = Path(__file__).resolve().parents[4] / "examples" / "lead-management" / "workflows" / "lead-management-google-form.local.json"
+MANUAL_PREVIEW = Path(__file__).resolve().parents[4] / "examples" / "lead-management" / "workflows" / "lead-management-google-form.manual-preview.json"
 
 
 def test_google_form_n8n_export_only_routes_new_rows_to_local_preview():

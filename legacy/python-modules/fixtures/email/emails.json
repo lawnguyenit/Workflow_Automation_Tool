@@ -1,0 +1,68 @@
+{
+  "description": "Synthetic, non-personal test messages only",
+  "fixtures": {
+    "synthetic_invoice": [
+      {
+        "message_id": "fixture-message-001",
+        "thread_id": "fixture-thread-001",
+        "subject": "Synthetic invoice intake",
+        "sender": "billing@example.invalid",
+        "attachments": [
+          {
+            "attachment_id": "fixture-attachment-001",
+            "filename": "invoice-1001.pdf",
+            "mime_type": "application/pdf",
+            "content_base64": "JVBERi0xLjMKJZOMi54gUmVwb3J0TGFiIEdlbmVyYXRlZCBQREYgZG9jdW1lbnQgKG9wZW5zb3VyY2UpCjEgMCBvYmoKPDwKL0YxIDIgMCBSCj4+CmVuZG9iagoyIDAgb2JqCjw8Ci9CYXNlRm9udCAvSGVsdmV0aWNhIC9FbmNvZGluZyAvV2luQW5zaUVuY29kaW5nIC9OYW1lIC9GMSAvU3VidHlwZSAvVHlwZTEgL1R5cGUgL0ZvbnQKPj4KZW5kb2JqCjMgMCBvYmoKPDwKL0NvbnRlbnRzIDcgMCBSIC9NZWRpYUJveCBbIDAgMCA1OTUuMjc1NiA4NDEuODg5OCBdIC9QYXJlbnQgNiAwIFIgL1Jlc291cmNlcyA8PAovRm9udCAxIDAgUiAvUHJvY1NldCBbIC9QREYgL1RleHQgL0ltYWdlQiAvSW1hZ2VDIC9JbWFnZUkgXQo+PiAvUm90YXRlIDAgL1RyYW5zIDw8Cgo+PiAKICAvVHlwZSAvUGFnZQo+PgplbmRvYmoKNCAwIG9iago8PAovUGFnZU1vZGUgL1VzZU5vbmUgL1BhZ2VzIDYgMCBSIC9UeXBlIC9DYXRhbG9nCj4+CmVuZG9iago1IDAgb2JqCjw8Ci9BdXRob3IgKGFub255bW91cykgL0NyZWF0aW9uRGF0ZSAoRDoyMDI2MTAwMzA5MDYyMyswNycwMCcpIC9DcmVhdG9yIChhbm9ueW1vdXMpIC9LZXl3b3JkcyAoKSAvTW9kRGF0ZSAoRDoyMDI2MTAwMzA5MDYyMyswNycwMCcpIC9Qcm9kdWNlciAoUmVwb3J0TGFiIFBERiBMaWJyYXJ5IC0gXChvcGVuc291cmNlXCkpIAogIC9TdWJqZWN0ICh1bnNwZWNpZmllZCkgL1RpdGxlICh1bnRpdGxlZCkgL1RyYXBwZWQgL0ZhbHNlCj4+CmVuZG9iago2IDAgb2JqCjw8Ci9Db3VudCAxIC9LaWRzIFsgMyAwIFIgXSAvVHlwZSAvUGFnZXMKPj4KZW5kb2JqCjcgMCBvYmoKPDwKL0ZpbHRlciBbIC9BU0NJSTg1RGVjb2RlIC9GbGF0ZURlY29kZSBdIC9MZW5ndGggMTg0Cj4+CnN0cmVhbQpHYXJvOzBha2lQJjtCbFhNRHFRLmhMdU47VUtYPzY/JGEqNiZ1IWIrOm9zSGBOUFY8QGpjMjg+aHRRJUcnU14sSyViTSo9N2c6S2IlQk5WTEVeRCpFXEZVNmVXMz9ERVIsc0IxZkA0c1JcTy4tXjMpWWtoI09nRWVwKm06a2phOmpLbXM3M3RSQjdPXlVEVmVaLypGbF9hW0E2QylBPlIoU2xNOT4+VFVhMDZtRWJwI05FP1VaMn4+ZW5kc3RyZWFtCmVuZG9iagp4cmVmCjAgOAowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwNjEgMDAwMDAgbiAKMDAwMDAwMDA5MiAwMDAwMCBuIAowMDAwMDAwMTk5IDAwMDAwIG4gCjAwMDAwMDA0MDIgMDAwMDAgbiAKMDAwMDAwMDQ3MCAwMDAwMCBuIAowMDAwMDAwNzMxIDAwMDAwIG4gCjAwMDAwMDA3OTAgMDAwMDAgbiAKdHJhaWxlcgo8PAovSUQgCls8YjRlZTk1YTdhYTUwNzdlNWFiOTEzNTllYmMwMzdjMmM+PGI0ZWU5NWE3YWE1MDc3ZTVhYjkxMzU5ZWJjMDM3YzJjPl0KJSBSZXBvcnRMYWIgZ2VuZXJhdGVkIFBERiBkb2N1bWVudCAtLSBkaWdlc3QgKG9wZW5zb3VyY2UpCgovSW5mbyA1IDAgUgovUm9vdCA0IDAgUgovU2l6ZSA4Cj4+CnN0YXJ0eHJlZgoxMDY0CiUlRU9GCg=="
+          }
+        ],
+        "source_system": "gmail_fixture",
+        "source_account": "fixture:synthetic_invoice"
+      }
+    ],
+    "synthetic_duplicate": [
+      {
+        "message_id": "fixture-message-dup",
+        "thread_id": "fixture-thread-dup",
+        "subject": "Duplicate synthetic invoice",
+        "sender": "billing@example.invalid",
+        "attachments": [
+          {
+            "attachment_id": "same-provider-attachment-id",
+            "filename": "invoice-1001.pdf",
+            "mime_type": "application/pdf",
+            "content_base64": "JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA2MTIgNzkyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA0IDAgUiA+PiA+PiAvQ29udGVudHMgNSAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+CmVuZG9iago1IDAgb2JqCjw8IC9MZW5ndGggNjQgPj4Kc3RyZWFtCkJUIC9GMSAxMiBUZiA3MiA3MjAgVGQgKEludm9pY2UgSU5WLTEwMDEgQW1vdW50IFVTRCAxMjAwKSBUaiBFVAplbmRzdHJlYW0KZW5kb2JqCnhyZWYKMCA2CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAwOSAwMDAwMCBuIAowMDAwMDAwMDU4IDAwMDAwIG4gCjAwMDAwMDAxMTUgMDAwMDAgbiAKMDAwMDAwMDI0MSAwMDAwMCBuIAowMDAwMDAwMzExIDAwMDAwIG4gCnRyYWlsZXIKPDwgL1NpemUgNiAvUm9vdCAxIDAgUiA+PgpzdGFydHhyZWYKNDI0CiUlRU9GCg=="
+          }
+        ],
+        "source_system": "gmail_fixture",
+        "source_account": "fixture:synthetic_duplicate"
+      },
+      {
+        "message_id": "fixture-message-dup",
+        "thread_id": "fixture-thread-dup",
+        "subject": "Duplicate synthetic invoice",
+        "sender": "billing@example.invalid",
+        "attachments": [
+          {
+            "attachment_id": "same-provider-attachment-id",
+            "filename": "invoice-1001.pdf",
+            "mime_type": "application/pdf",
+            "content_base64": "JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA2MTIgNzkyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA0IDAgUiA+PiA+PiAvQ29udGVudHMgNSAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+CmVuZG9iago1IDAgb2JqCjw8IC9MZW5ndGggNjQgPj4Kc3RyZWFtCkJUIC9GMSAxMiBUZiA3MiA3MjAgVGQgKEludm9pY2UgSU5WLTEwMDEgQW1vdW50IFVTRCAxMjAwKSBUaiBFVAplbmRzdHJlYW0KZW5kb2JqCnhyZWYKMCA2CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAwOSAwMDAwMCBuIAowMDAwMDAwMDU4IDAwMDAwIG4gCjAwMDAwMDAxMTUgMDAwMDAgbiAKMDAwMDAwMDI0MSAwMDAwMCBuIAowMDAwMDAwMzExIDAwMDAwIG4gCnRyYWlsZXIKPDwgL1NpemUgNiAvUm9vdCAxIDAgUiA+PgpzdGFydHhyZWYKNDI0CiUlRU9GCg=="
+          }
+        ],
+        "source_system": "gmail_fixture",
+        "source_account": "fixture:synthetic_duplicate"
+      }
+    ],
+    "synthetic_no_attachment": [
+      {
+        "message_id": "fixture-message-empty",
+        "thread_id": "fixture-thread-empty",
+        "subject": "Synthetic message without files",
+        "sender": "ops@example.invalid",
+        "attachments": [],
+        "source_system": "gmail_fixture",
+        "source_account": "fixture:synthetic_no_attachment"
+      }
+    ]
+  }
+}

@@ -22,7 +22,7 @@ def test_demo_composes_every_module_instance_and_gates_non_success_states():
 
 
 def test_lead_management_template_is_private_synthetic_preview():
-    path = Path(__file__).resolve().parents[2] / "workflows" / "n8n" / "lead-management-local.demo.json"
+    path = Path(__file__).resolve().parents[4] / "examples" / "lead-management" / "workflows" / "lead-management-local.demo.json"
     workflow = json.loads(path.read_text(encoding="utf-8"))
     http_nodes = [node for node in workflow["nodes"] if node["type"] == "n8n-nodes-base.httpRequest"]
     assert len(http_nodes) == 1
