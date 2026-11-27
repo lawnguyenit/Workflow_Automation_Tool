@@ -37,6 +37,6 @@ only points here.
   docs and commits.
 - Keep client-specific workflows, credentials and outputs out of this repository.
 - When intent, decisions, implementation or verification change, update `docs/architecture.md`
-  and the records in `docs/project-state/`. Never record a proposal as implemented or verified.
+  and the records in `docs/history/project-state/`. Never record a proposal as implemented or verified.
 - `legacy/python-modules/` stays runnable (`cd legacy/python-modules && uv run --extra dev pytest -q`)
   but gets no new features.
