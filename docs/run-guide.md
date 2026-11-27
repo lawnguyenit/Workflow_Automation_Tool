@@ -1,37 +1,48 @@
-# Run guide and execution modes
+# Run guide (n8n stack)
 
-Moved from the top-level README so the README stays short. Text is unchanged except relative links.
+The quick version is in the [README](../README.md#run-it-in-10-minutes). This page adds what the
+README leaves out. The Python-era run guide (FastAPI, execution modes) is in
+[history/](history/README.md).
 
-## Run the synthetic portfolio
+## Stack
 
-Requirements: Python 3.12+, `uv`, and no provider credentials for the dry-run path.
+`docker compose up -d` from the repo root starts two containers from `infra/docker-compose.yml`
+(the root file only `include`s it): `n8nio/n8n:2.49.8` and `postgres:18-alpine`. Both ports are bound
+to `127.0.0.1`. On the first start of an empty Postgres volume, every `infra/postgres/*.sql` file runs
+in name order: `00-create-n8n-db.sql` (n8n's own database) and `10-invoice-intake.sql` (application
+tables). Init scripts do not run again on an existing volume; apply later schema changes by hand.
 
-```powershell
-uv sync --extra dev
-uv run uvicorn workflow_automation.api:app --app-dir src --host 127.0.0.1 --port 8000
+Required in `.env`: `POSTGRES_PASSWORD` (URL-safe) and `N8N_ENCRYPTION_KEY` (>= 32 random characters;
+back it up, without it stored credentials cannot be read). Never commit `.env`.
+
+## Credentials (names must match exactly)
+
+| Name in n8n | Type | Values |
+| --- | --- | --- |
+| `Postgres (local)` | Postgres | host `postgres`, port `5432`, database `workflow_automation`, user `workflow`, password = `POSTGRES_PASSWORD`, SSL off |
+| `Gemini API` | Google Gemini(PaLM) API | your API key; host `https://generativelanguage.googleapis.com` |
+| `Gmail (secondary account)` | Gmail OAuth2 API | OAuth client from a Google Cloud project you own; use a secondary mailbox, not a primary one |
+
+Importing before the credentials exist works, but the nodes stay unattached; create the credentials and
+run the import again.
+
+## Import and publish
+
+```bash
+node scripts/n8n-import.js --docker "$(docker compose ps -q n8n)"
 ```
 
-In another terminal, run the full synthetic graph without database writes or provider calls:
+The script ends with `expected 7, found on target 7` when all workflows landed. In the n8n editor
+publish, in this order: the five `sub:` workflows and `error handler`, then `invoice intake`.
+n8n 2.x cannot call an unpublished sub-workflow, and publishing needs the credentials to exist.
+Before publishing, replace the `example.invalid` recipients in the **Notification settings** node
+(`sub: notify`) and the **Alert settings** node (`error handler`).
 
-```powershell
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/workflows/intelligent_document_intake/runs -ContentType 'application/json' -Body '{}'
-```
+## Things to know before real mail
 
-The API returns sanitized step states and invoice fields; it omits attachment bytes and extracted PDF text from its aggregate workflow response. `/healthz` is a process health check, and `/v1/catalog` lists module definitions, implementations, instances, workflow definitions, and workflow instances. `POST /v1/instances/{instance_id}/runs` lets external orchestrators run one module, while `/v1/workflow-instances/{workflow_instance_id}/runs` runs a concrete workflow binding. `MOCK`/`REAL` and any live Gmail read require `WORKFLOW_API_KEY` and `Authorization: Bearer <key>`; when the key is unset those operations are rejected. `DRY_RUN`/`REPLAY` requests work without a key so the n8n template remains runnable. The API does not enforce synthetic-only preview payloads or verify that `REPLAY` inputs were captured and sanitized; they may contain sensitive business data, so keep the service on loopback/private networking and sanitize replay data before submission. Do not expose this API publicly without a stronger deployment access boundary.
-
-For an opt-in PostgreSQL/n8n local stack, copy `.env.example` to `.env`, replace the PostgreSQL and n8n local-only secrets, then run `docker compose up --build`. Set a long random `WORKFLOW_API_KEY` before allowing `MOCK`/`REAL` calls or live Gmail reads. Use a URL-safe PostgreSQL password (letters, numbers, hyphen, underscore) because Compose passes it inside `DATABASE_URL`. The app is available on `127.0.0.1:8000` and n8n on `127.0.0.1:5678`. Import `workflows/n8n/intelligent-document-intake.demo.json`; its six HTTP nodes call the module-instance API individually in `DRY_RUN` and gate each step on `SUCCESS`. The JSON is a starter template and needs validation against the exact n8n image/version selected for a job. If the workflow is changed to `MOCK`/`REAL` or live Gmail input, configure matching Header Auth credentials on the n8n HTTP nodes. Never use the demo workflow to handle client documents without reviewing n8n execution-data retention and access first.
-
-### Lead-management reference
-
-`workflows/n8n/lead-management-local.demo.json` is a private, manual-trigger preview with a synthetic `.invalid` email address. It invokes `portfolio.lead_management_local` in `DRY_RUN`, so it does not write to PostgreSQL or send a message. The real local API/DB path has also been exercised separately with synthetic payloads in `MOCK` mode: first-write, same-event duplicate, changed-payload conflict, missing-field review, and API response redaction. Current results intentionally end at `REVIEW_REQUIRED`; there is no configured GHL, qualification rubric, OpenAI API, email sender, or public form callback. See [lead-management module contract and limits](modules/lead-management-reference.md).
-
-The private Google Form draft `Lead Intake Lab - Test Only` is unpublished and linked to a response Sheet. Local n8n and API ports bind to loopback. Do not publish the form or expose a public callback unless the owner explicitly requests it after the access and data-handling setup is understood. The user's VPS that hosts an online game is outside this project.
-
-### Execution modes
-
-- `DRY_RUN`: preview extraction and validation; PostgreSQL writes and output side effects are skipped. The API does not restrict inputs to fixtures, so caller-supplied business data may be processed.
-- `REPLAY`: deterministic replay path; persistence and delivery are skipped.
-- `MOCK`: deterministic/mock extraction; PostgreSQL and the notification outbox are written, but no output provider is contacted. Use only with a deliberate local/test database.
-- `REAL`: Gmail read, OpenAI extraction, PostgreSQL, and Slack can run only when each is configured. This mode is not an end-to-end claim and needs per-client authorization, policy, credentials, retention, and operational setup.
-
-Details on duplicate handling, concurrency, limits, recovery, and unverified integrations are in [portfolio module guarantees](modules/portfolio-modules.md). Release notes: [0.1.0](releases/0.1.0.md), [0.2.0](releases/0.2.0.md).
+- The Gmail trigger polls once a minute and only sees mail after `invoice intake` is published.
+- The PDF text is sent to Gemini. Check Google's API terms and data region for your documents.
+- Failed executions keep item data in n8n's database; `EXECUTIONS_DATA_MAX_AGE` (default 336 hours)
+  prunes it. Match it to your retention policy.
+- Known limits L1 to L5 are in [architecture.md](architecture.md#known-limits).
+- Incident handling: [runbooks/incidents.md](runbooks/incidents.md).

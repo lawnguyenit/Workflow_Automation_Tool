@@ -1,99 +1,130 @@
-# Workflow Automation Modules
+# Invoice intake automation on n8n
 
-Reusable building blocks for workflow automation (n8n first, plain Python/HTTP also supported), with a reference "Intelligent Document Intake" workflow: read an email with a PDF invoice, extract the fields, validate them, store them in PostgreSQL, and prepare a notification.
+An n8n automation that reads invoice PDFs from Gmail, extracts the fields with Gemini, validates them, stores them in PostgreSQL without duplicates, and sends a notification email.
 
-**Status:** portfolio system, built and tested locally with synthetic data. Not a client deployment, not used in production. No live Gmail, OpenAI, Slack, CRM or Google Forms call has been made (see "Not yet done").
+**Status:** built and tested locally with synthetic fixtures. Not yet run against live Gmail or Gemini (that needs the owner's credentials). Not a client deployment. Details in [Status](#status).
 
 Author: Lam-Nguyen Nguyen. CV: https://cv.lnit.id.vn
 
+![Canvas of the invoice intake workflow in the n8n editor](docs/images/canvas-invoice-intake.png)
+
 ## Tóm tắt (Tiếng Việt)
 
-- Bộ module tự động hóa quy trình làm việc (workflow), ưu tiên n8n: nhận email có hóa đơn PDF, đọc và trích xuất thông tin, kiểm tra, lưu vào cơ sở dữ liệu PostgreSQL, rồi tạo thông báo.
-- Đây là hệ thống mẫu để làm portfolio, chạy trên máy cá nhân với dữ liệu giả. Chưa triển khai cho khách hàng, chưa chạy production, chưa gọi dịch vụ thật (Gmail, OpenAI, Slack, CRM).
-- Hiện có: API chạy được ở chế độ thử (DRY_RUN) không cần khóa dịch vụ nào, 198 bài test tự động đạt (chạy lại ngày 27/11/2026), mẫu workflow n8n để nhập vào.
-- Mã được viết bằng công cụ AI (Claude, Codex) theo thiết kế và yêu cầu của tác giả, sau đó tác giả và các agent kiểm tra độc lập rà soát và kiểm thử.
+- Đây là một automation trên n8n: nhận email có hóa đơn PDF qua Gmail, trích xuất thông tin bằng Gemini, kiểm tra, lưu vào PostgreSQL (không lưu trùng), rồi gửi email thông báo. Email trùng được bỏ qua; mọi lỗi được ghi vào bảng sự cố và gửi cảnh báo.
+- Cấu trúc: một workflow điều phối (`invoice intake`), 5 sub-workflow (kiểm tra trùng, trích xuất, kiểm tra hợp lệ, lưu, thông báo) và một workflow xử lý lỗi. Các luật nghiệp vụ nằm trong `code/` (JavaScript thuần, có test) và được nhúng vào các node Code.
+- Trạng thái: đã xây và kiểm thử cục bộ bằng dữ liệu giả (42 test code, 28 test công cụ, chạy thử trên n8n 2.49.8 và Postgres thật). Chưa chạy với Gmail và Gemini thật vì cần thông tin đăng nhập của chủ dự án. Chưa triển khai cho khách hàng.
+- Mã được viết bằng công cụ AI (Claude, Codex) theo thiết kế và yêu cầu của tác giả; tác giả và các agent kiểm tra độc lập rà soát và kiểm thử. Giai đoạn trước (thư viện Python) được giữ trong `docs/history/` và `legacy/`.
 
-## What problem it solves
+## What it does
 
-- Small teams receive documents (invoices, forms) by email or form and copy data by hand. The reference workflow shows how to automate that path.
-- Automations often fail quietly: duplicate runs, double writes, retries that send twice. Each module here documents its duplicate handling, retry and failure behavior, and the tests cover those cases.
-- When you only have the workflow nodes and no access to the client's system, debugging is hard. Modules return sanitized, bounded diagnostics, and failed runs go into an incident log with no raw personal data.
-
-## What works today and what does not
-
-Verified from code, tests and docs in this repo. Test status below was re-run on 2026-11-27 unless noted.
-
-### Works today (synthetic data, local)
-
-- Full document-intake graph in `DRY_RUN` mode: email fixture -> PDF text -> field extraction -> validation -> storage preview -> notification preview. Re-checked: the API returned `SUCCESS` for all steps with no credentials.
-- Unit test suite: `uv run --extra dev pytest -q` gives **198 passed** (about 2 seconds).
-- Module API with catalog, per-module and per-workflow run routes, execution modes `DRY_RUN`, `REPLAY`, `MOCK`, `REAL`.
-- PostgreSQL storage with idempotency keys (duplicate and changed-payload handling), a notification outbox, a source-poll lease/checkpoint, an incident log, and ledgers for CRM and LLM calls. Evidence: 10 Docker Compose + PostgreSQL integration scripts in `tests/integration/` (recorded as passing in `docs/project-state/verification.md`; **not re-run for this README**).
-- n8n starter workflow `workflows/n8n/intelligent-document-intake.demo.json` (six HTTP nodes calling the API in `DRY_RUN`). A separate lead-management preview workflow was imported and run once in a local n8n (recorded in the project-state docs; not re-run here).
-- Reusable adapter modules with mocked-HTTP tests: HighLevel (GHL) contact upsert, opportunity upsert, contact tags; Gmail send; lead intake, qualification and follow-up gate.
-
-### Not yet done / not verified
-
-- No live provider call has been made: Gmail read/send, OpenAI extraction or qualification, Slack, HighLevel CRM, Google Forms API. Adapters are tested against mocks only.
-- The Google Forms API poller n8n workflow is imported but inactive; OAuth is not granted and it has never run.
-- The lead-management brief is only partly built. The graph ends at PostgreSQL storage; CRM and follow-up modules exist but are not wired into it.
-- Safety limits are partial: the LLM cap counts requests per day, not money; there is no external alerting, retry scheduler or retention job.
-- The API uses one shared bearer key, not per-user login. Keep it on loopback/private network. Do not use with client documents before reviewing n8n data retention and access.
-- The n8n JSON files are starter templates; they must be validated against the exact n8n version used for a real job.
-- No real client data, no client deployment, no production use.
-
-The authoritative record is in [project state](docs/project-state/README.md) (intent, decisions, implementation, verification). A proposal is never counted as implemented there.
+1. A new email with a PDF attachment arrives in a Gmail inbox. Each PDF becomes one item and its bytes are hashed.
+2. If the same email and the same PDF were already stored, the item is skipped (no AI call, no second notification).
+3. The PDF text is sent to Gemini, which returns the invoice fields in a fixed JSON schema. A daily cap limits the number of Gemini calls.
+4. The fields are validated (required fields, amount, currency, confidence, thresholds). Anything uncertain, unreadable or image-only is marked `REVIEW_REQUIRED` and is not stored.
+5. Valid invoices are inserted into PostgreSQL once per idempotency key. A same-key row with different content is reported as a conflict; the first row is kept.
+6. An email reports the outcome (stored, conflict, or needs review).
+7. Any failure in any workflow writes a row without personal data to `incident_log` and sends one alert email.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    n8n[n8n workflow<br/>or any HTTP caller] --> api[FastAPI module API]
-    api --> input[Input<br/>email fixture / Gmail]
-    input --> proc[Processing<br/>PDF text, LLM extraction, validation]
-    proc --> store[(PostgreSQL<br/>idempotent storage)]
-    store --> out[Output<br/>notification outbox / Slack]
-    api -. failures .-> inc[(Incident log)]
+  G([Gmail trigger]) --> O[invoice intake<br/>orchestrator]
+  O --> D[[sub: check duplicate]]
+  O --> E[[sub: extract invoice]]
+  O --> V[[sub: validate invoice]]
+  O --> S[[sub: store invoice]]
+  O --> N[[sub: notify]]
+  D --> PG[(PostgreSQL)]
+  E --> AI{{Gemini API}}
+  E --> PG
+  S --> PG
+  N --> GM{{Gmail send}}
+  O & D & E & V & S & N -. any failure .-> H[error handler]
+  H --> PG
+  H --> GM
 ```
 
-Stages are input, processing, storage and output. Cross-cutting concerns (idempotency, retry, concurrency, security, recovery, observability) are documented per module. Contracts are platform-neutral so n8n can be replaced.
+The orchestrator only routes; each sub-workflow has one responsibility, declared typed inputs and a fixed output shape. The full flow, contracts, stored data and known limits are in [docs/architecture.md](docs/architecture.md).
 
-## Quick start
+| Workflow | Responsibility | Input | Output |
+| --- | --- | --- | --- |
+| [`invoice intake`](workflows/invoice-intake/README.md) | Read Gmail, split one item per PDF, hash, call the sub-workflows, route by result | New email with PDF attachment(s) | Final status per PDF: `DUPLICATE_SKIPPED` or `NOTIFIED` |
+| [`sub: check duplicate`](workflows/sub/check-duplicate/README.md) | Look up the idempotency key | `message_id`, `attachment_sha256` | `{ idempotency_key, is_duplicate, existing_invoice_id }` |
+| [`sub: extract invoice`](workflows/sub/extract-invoice/README.md) | PDF text, reserve a Gemini call under the daily cap, call Gemini, parse | key, message and attachment ids, filename, PDF binary | `{ record, extraction_status, error_code }` |
+| [`sub: validate invoice`](workflows/sub/validate-invoice/README.md) | Apply the validation rules | `invoice` object | `{ valid, status, invoice, issues }` |
+| [`sub: store invoice`](workflows/sub/store-invoice/README.md) | Idempotent insert, compare fingerprint | key, ids, filename, `invoice` | `{ outcome: STORED / DUPLICATE / CONFLICT, invoice_id, reason }` |
+| [`sub: notify`](workflows/sub/notify/README.md) | Compose and send the outcome email | status, invoice fields, issue codes | `{ notified, channel, provider_message_id }` |
+| [`error handler`](workflows/error-handler/README.md) | Write a masked `incident_log` row, send an alert | n8n error trigger data | incident row + one alert email |
 
-Needs Python 3.12+ and `uv`. No provider credentials are needed for the dry run.
+| Canvas: `sub: extract invoice` | Canvas: `error handler` |
+| --- | --- |
+| ![sub: extract invoice canvas](docs/images/canvas-sub-extract-invoice.png) | ![error handler canvas](docs/images/canvas-error-handler.png) |
 
+## Reliability features and how each is verified
+
+| Feature | Verified by |
+| --- | --- |
+| Idempotent store: key = `sha256(message_id + PDF sha256)`, `INSERT .. ON CONFLICT DO NOTHING`, fingerprint compare (STORED / DUPLICATE / CONFLICT) | Unit tests in `code/test/`; smoke run on n8n 2.49.8 + Postgres: one key gave STORED, DUPLICATE, CONFLICT and one row |
+| Duplicate email skipped before any AI call | Smoke run of an orchestrator copy with Gmail replaced by a fixture: duplicate email gave `DUPLICATE_SKIPPED` |
+| Daily Gemini call cap, reserved atomically in Postgres | Unit tests; smoke run with the ledger seeded at the limit: `DAILY_AI_CAP_REACHED`, ledger unchanged; SQL reservation run directly with limit 2 (1, 2, then no row) |
+| Unreadable input never stored: image-only PDF, corrupt PDF, uncertain fields go to `REVIEW_REQUIRED` | Unit tests; smoke runs gave `OCR_REQUIRED` and `UNREADABLE_PDF` |
+| Failures logged without personal data and alerted | Unit tests of masking; smoke run of an error handler copy wrote an incident row with e-mail address and digit runs masked |
+| Workflows stable in git | `scripts/n8n-normalize.js --check`, `n8n-lint.js`, `n8n-docs.js --check`; round trip import/export on n8n 2.49.8 gave identical files (recorded in the tooling report) |
+
+Counts re-run on 2026-11-27: `cd code && node --test` 42 tests, 42 pass; `node --test scripts/test/*.test.js` 28 tests, 28 pass; lint, normalize check and docs check pass on 7 workflow files. CI runs the same static checks plus the round trip (`.github/workflows/n8n-checks.yml`). Gmail read/send and Gemini were replaced in the smoke runs, so none of the rows above covers those calls.
+
+## Status
+
+- Built and tested locally with synthetic fixtures (`tests/fixtures/`) on a throwaway n8n 2.49.8 and Postgres.
+- **Not yet run against live Gmail or Gemini.** That needs the owner's credentials. The Gemini request schema, model id (`gemini-2.5-flash`) and response parsing are tested only against fixtures; the `STORED` path through the whole orchestrator has not run because it needs a real Gemini answer.
+- Not a client deployment and not used in production.
+- Open limits (full list in [architecture.md](docs/architecture.md#known-limits)): if Gmail send fails after a successful store, a re-run skips the notification (L1); PDFs beyond 100 pages are truncated without a review flag; the call cap counts attempts, not money.
+- The PDF text goes to Gemini. Check Google's API terms and data region before using real invoices.
+
+## Run it in 10 minutes
+
+Needs Docker with Compose v2 and Node.js 22+ for the scripts.
+
+```bash
+cp .env.example .env        # set POSTGRES_PASSWORD (URL-safe) and N8N_ENCRYPTION_KEY (>= 32 chars)
+docker compose up -d        # n8n 2.49.8 on http://127.0.0.1:5678, Postgres with the schema
 ```
-uv sync --extra dev
-uv run pytest -q
-uv run uvicorn workflow_automation.api:app --app-dir src --host 127.0.0.1 --port 8000
-```
 
-In another terminal (the repo documents the PowerShell form; this is the same call with curl):
+1. Open http://127.0.0.1:5678 and create the owner account.
+2. Create three credentials with exactly these names (details in [docs/run-guide.md](docs/run-guide.md)): `Postgres (local)`, `Gemini API`, `Gmail (secondary account)`.
+3. Import: `node scripts/n8n-import.js --docker "$(docker compose ps -q n8n)"`. It reports `expected 7, found on target 7`.
+4. Publish in this order: the five `sub:` workflows and `error handler` first, then `invoice intake`. Set real recipients in the **Notification settings** and **Alert settings** nodes first (they hold `example.invalid`).
 
-```
-curl -X POST http://127.0.0.1:8000/v1/workflows/intelligent_document_intake/runs -H "Content-Type: application/json" -d "{}"
-```
+Back up `N8N_ENCRYPTION_KEY`. Steps 2 and 4 use real accounts and were not executed against live services (see Status).
 
-`/healthz` checks the process and `/v1/catalog` lists modules and workflows. For the PostgreSQL + n8n Docker Compose stack (copy `.env.example` to `.env`, set local secrets, `docker compose up --build`), the PowerShell call, execution modes and the lead-management reference, see the [run guide](docs/run-guide.md).
+## Edit a workflow and save it to git
+
+1. Edit in the n8n editor (or change `code/src/*.js` and run `node code/tools/build-workflows.js`).
+2. Export: `node scripts/n8n-export.js --docker "$(docker compose ps -q n8n)"` (writes normalized `workflows/**/workflow.json`; credentials are never exported).
+3. Regenerate docs: `node scripts/n8n-docs.js`.
+4. Check: `node scripts/n8n-lint.js && node scripts/n8n-normalize.js --check && node --test scripts/test/*.test.js && (cd code && node --test)`.
+5. Review the diff and commit. Note: the generator overwrites UI edits of generated workflows on its next run, so port UI changes into `code/tools/build-workflows.js`. See [docs/tooling.md](docs/tooling.md).
 
 ## Repository layout
 
-```
-src/workflow_automation/   framework core, API, modules (input, processing, storage, output, crm), PostgreSQL infrastructure
-tests/                     unit tests and Docker/PostgreSQL integration scripts
-workflows/n8n/             importable n8n workflow templates
-fixtures/                  synthetic emails and PDFs
-infra/postgres/            database initialisation
-docs/                      plan, module contracts, per-module guarantees, runbooks, release notes, project state
-Dockerfile, docker-compose.yml, .env.example
-```
+| Path | Content |
+| --- | --- |
+| `workflows/` | n8n workflows as normalized JSON + generated README per workflow |
+| `code/` | Business rules as plain JavaScript (`src/`), `node:test` tests (`test/`), workflow generator and smoke harness (`tools/`) |
+| `scripts/` | n8n export / import / normalize / docs / lint scripts and their tests |
+| `infra/` | `docker-compose.yml` (pinned n8n + Postgres), `postgres/` init SQL |
+| `tests/fixtures/` | Synthetic emails and PDFs |
+| `docs/` | [architecture](docs/architecture.md), [tooling](docs/tooling.md), [run guide](docs/run-guide.md), [incident runbook](docs/runbooks/incidents.md), [images](docs/images/) |
+| `docs/history/`, `legacy/`, `examples/` | Earlier phases, see below |
+| `AGENTS.md` | Rules for AI coding agents (`CLAUDE.md` and `GEMINI.md` point to it) |
 
-Key docs: [run guide](docs/run-guide.md), [project plan](docs/plan.md), [module contract](docs/module-contract.md), [module quality template](docs/module-quality-template.md), [portfolio module guarantees](docs/modules/portfolio-modules.md), [lead-management reference](docs/modules/lead-management-reference.md), [runbooks](docs/runbooks/workflow-incidents.md), [releases](docs/releases/0.14.0.md) (0.1.0 to 0.14.0 in `docs/releases/`).
+## History
+
+The repository started as a Python module library with a FastAPI layer. That code is in [`legacy/python-modules/`](legacy/python-modules/) (still runnable, no new features), its documents in [docs/history/](docs/history/README.md), and the never-run lead-management workflows in [`examples/lead-management/`](examples/lead-management/).
 
 ## How it was built
 
-Designed and directed by Lam-Nguyen Nguyen; code written with AI coding agents (Claude, Codex) under his specifications, then reviewed and tested by him and independent agent reviews (audit records are in `docs/project-state/`).
+Designed and directed by Lam-Nguyen Nguyen. The code was written with the AI coding agents Claude and Codex. He reviewed and tested it, and independent agent reviews checked it.
 
-## Contact
-
-CV and contact: https://cv.lnit.id.vn
+Contact: https://cv.lnit.id.vn
