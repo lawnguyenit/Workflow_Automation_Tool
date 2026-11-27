@@ -1,0 +1,1055 @@
+{
+  "name": "invoice intake",
+  "description": "Orchestrator: Gmail trigger and sub-workflow calls only. No business rules here.",
+  "tags": [],
+  "settings": {
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "@workflow:error handler",
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false
+  },
+  "nodes": [
+    {
+      "id": "d94f66e1-540d-5bf2-a69a-8bf324de62f4",
+      "name": "Already stored?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1140,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "a441bdbd-504e-45fc-8005-4b315d092364",
+              "leftValue": "={{ $json.is_duplicate }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a4552fbe-87a3-5c13-90d5-d4dd5a3b4cb4",
+      "name": "Attach duplicate result to PDF",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        0
+      ],
+      "parameters": {
+        "jsCode": "\n// Plumbing only: the sub-workflow returns new items; put provenance + hash back (from the\n// Crypto node) and the PDF binary back (from the split node: the Crypto node drops binary).\nreturn $input.all().map((item, i) => {\n  const hashed = $('Hash PDF bytes (SHA-256)').itemMatching(i);\n  const split = $('Split one item per PDF attachment').itemMatching(i);\n  return { json: { ...hashed.json, ...item.json }, binary: split.binary, pairedItem: { item: i } };\n});"
+      }
+    },
+    {
+      "id": "474897b6-d4bd-57c3-81eb-8e5174f4ca1e",
+      "name": "Call: Check duplicate invoice",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        700,
+        0
+      ],
+      "parameters": {
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        },
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "@workflow:sub: check duplicate"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "message_id",
+              "id": "message_id",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "attachment_sha256",
+              "id": "attachment_sha256",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "attachment_sha256": "={{ $json.attachment_sha256 }}",
+            "message_id": "={{ $json.message_id }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "1ec420fd-b7ad-5e94-b5bf-880ad67539b0",
+      "name": "Call: Extract invoice fields",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1420,
+        100
+      ],
+      "parameters": {
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        },
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "@workflow:sub: extract invoice"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "idempotency_key",
+              "id": "idempotency_key",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "message_id",
+              "id": "message_id",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "attachment_id",
+              "id": "attachment_id",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "filename",
+              "id": "filename",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "attachment_id": "={{ $json.attachment_id }}",
+            "filename": "={{ $json.filename }}",
+            "idempotency_key": "={{ $json.idempotency_key }}",
+            "message_id": "={{ $json.message_id }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "0a12e7c2-88b7-5c21-b478-5447d975a119",
+      "name": "Call: Send invoice notification",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2860,
+        100
+      ],
+      "parameters": {
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        },
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "@workflow:sub: notify"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "status",
+              "id": "status",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "invoice_number",
+              "id": "invoice_number",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "sender",
+              "id": "sender",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "amount",
+              "id": "amount",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "currency",
+              "id": "currency",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "invoice_id",
+              "id": "invoice_id",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "filename",
+              "id": "filename",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "issues",
+              "id": "issues",
+              "required": false,
+              "type": "array"
+            }
+          ],
+          "value": {
+            "amount": "={{ $json.amount }}",
+            "currency": "={{ $json.currency }}",
+            "filename": "={{ $json.filename }}",
+            "invoice_id": "={{ $json.invoice_id }}",
+            "invoice_number": "={{ $json.invoice_number }}",
+            "issues": "={{ $json.issues }}",
+            "sender": "={{ $json.sender }}",
+            "status": "={{ $json.status }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "b6e1e7c2-96b8-5167-aca2-c001dfe166c6",
+      "name": "Call: Store invoice",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2120,
+        0
+      ],
+      "parameters": {
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        },
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "@workflow:sub: store invoice"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "idempotency_key",
+              "id": "idempotency_key",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "message_id",
+              "id": "message_id",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "attachment_id",
+              "id": "attachment_id",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "filename",
+              "id": "filename",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "invoice",
+              "id": "invoice",
+              "required": false,
+              "type": "object"
+            }
+          ],
+          "value": {
+            "attachment_id": "={{ $('Attach duplicate result to PDF').item.json.attachment_id }}",
+            "filename": "={{ $('Attach duplicate result to PDF').item.json.filename }}",
+            "idempotency_key": "={{ $('Attach duplicate result to PDF').item.json.idempotency_key }}",
+            "invoice": "={{ $json.invoice }}",
+            "message_id": "={{ $('Attach duplicate result to PDF').item.json.message_id }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "ba339ff0-864f-5afa-b70a-4e5fb83e4ad4",
+      "name": "Call: Validate invoice",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1640,
+        100
+      ],
+      "parameters": {
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        },
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "@workflow:sub: validate invoice"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "invoice",
+              "id": "invoice",
+              "required": false,
+              "type": "object"
+            }
+          ],
+          "value": {
+            "invoice": "={{ $json.record }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "12abf29e-dd87-51e5-8b37-e822da341677",
+      "name": "Final status: duplicate skipped",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2860,
+        -160
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2d0f22ff-f364-4b59-8103-efe60e0ccbcb",
+              "name": "idempotency_key",
+              "type": "string",
+              "value": "={{ $('Attach duplicate result to PDF').item.json.idempotency_key }}"
+            },
+            {
+              "id": "0e92c194-ddcf-42fc-8b71-e75664b4dc86",
+              "name": "final_status",
+              "type": "string",
+              "value": "DUPLICATE_SKIPPED"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "3de6a54b-8c58-5b85-9290-ebdc59b77c7c",
+      "name": "Final status: notified",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3080,
+        100
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "aa0d5932-0551-4476-80a8-20c6b855142b",
+              "name": "idempotency_key",
+              "type": "string",
+              "value": "={{ $('Attach duplicate result to PDF').item.json.idempotency_key }}"
+            },
+            {
+              "id": "3ff671d0-c190-4afe-87b0-a40781986581",
+              "name": "final_status",
+              "type": "string",
+              "value": "={{ $('Call: Send invoice notification').item.json.notified ? 'NOTIFIED' : 'NOTIFY_FAILED' }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "6b03ef5e-7a58-5083-a901-f552df34b3f5",
+      "name": "Hash PDF bytes (SHA-256)",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "action": "hash",
+        "binaryData": true,
+        "binaryPropertyName": "invoice_pdf",
+        "dataPropertyName": "attachment_sha256",
+        "encoding": "hex",
+        "type": "SHA256"
+      }
+    },
+    {
+      "id": "19efdc62-f3f7-51b9-bd90-261792806f7f",
+      "name": "Invoice valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1860,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cdee6a03-f962-4f07-80ae-6f0dfa9018c3",
+              "leftValue": "={{ $json.valid }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4b3f63f1-e26f-576b-9820-4a16cc43472d",
+      "name": "Note: 1 intake",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -200
+      ],
+      "parameters": {
+        "color": 7,
+        "content": "### 1. Intake\nPolls the \"Gmail (secondary account)\" inbox for new mail with a PDF attachment, splits each PDF into its own item and hashes its bytes.",
+        "height": 160,
+        "width": 680
+      }
+    },
+    {
+      "id": "a4996281-5377-5aa0-8d90-ead13dc1f956",
+      "name": "Note: 2 dedupe",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        640,
+        -200
+      ],
+      "parameters": {
+        "color": 7,
+        "content": "### 2. Duplicate check\nSame email + same PDF bytes = same key. Already stored -> skip, no AI call, no email.",
+        "height": 160,
+        "width": 680
+      }
+    },
+    {
+      "id": "63f36f24-a910-529a-94af-c0a89ef65d91",
+      "name": "Note: 3 extract validate",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        -200
+      ],
+      "parameters": {
+        "color": 7,
+        "content": "### 3. Extract and validate\nGemini extraction behind a daily cap, then validation rules. Anything uncertain -> REVIEW_REQUIRED notification, nothing stored.",
+        "height": 160,
+        "width": 680
+      }
+    },
+    {
+      "id": "1899c5a0-6343-56e5-bc0d-7cec8c7a65a3",
+      "name": "Note: 4 store notify",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2080,
+        -200
+      ],
+      "parameters": {
+        "color": 7,
+        "content": "### 4. Store and notify\nIdempotent insert. STORED and CONFLICT send an email; a DUPLICATE found at insert time (race) is skipped.",
+        "height": 160,
+        "width": 900
+      }
+    },
+    {
+      "id": "7095b3aa-4da1-5cd3-a9a3-ff57a8db806d",
+      "name": "Note: overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -460
+      ],
+      "parameters": {
+        "color": 6,
+        "content": "## invoice intake (orchestrator)\nGmail -> one item per PDF -> check duplicate -> extract -> validate -> store -> notify.\nThis workflow only routes. All rules live in the sub-workflows and `code/src`.\nErrors anywhere go to **error handler**.\nContracts: `docs/architecture.md`.",
+        "height": 220,
+        "width": 560
+      }
+    },
+    {
+      "id": "8c70bc20-9a8e-5548-a120-7d07d5fb31fd",
+      "name": "Prepare notification: review needed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2120,
+        240
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "164dc199-971b-45b9-8537-c4ed9d6d79e8",
+              "name": "status",
+              "type": "string",
+              "value": "REVIEW_REQUIRED"
+            },
+            {
+              "id": "a8641a45-ef02-4f5c-8de8-2b274cfe28d5",
+              "name": "invoice_id",
+              "type": "string",
+              "value": "={{ null }}"
+            },
+            {
+              "id": "3500f4cc-1104-4e78-856a-bea61b2e9eab",
+              "name": "invoice_number",
+              "type": "string",
+              "value": "={{ $('Call: Extract invoice fields').item.json.record.invoice_number }}"
+            },
+            {
+              "id": "56a3fc9b-13f8-4c85-8331-c4db99a5f301",
+              "name": "sender",
+              "type": "string",
+              "value": "={{ $('Call: Extract invoice fields').item.json.record.sender }}"
+            },
+            {
+              "id": "8af5fd11-4f31-4be8-827e-7ba9292b055d",
+              "name": "amount",
+              "type": "string",
+              "value": "={{ $('Call: Extract invoice fields').item.json.record.amount === null ? null : String($('Call: Extract invoice fields').item.json.record.amount) }}"
+            },
+            {
+              "id": "59d5e984-2d83-470a-87aa-fa9d130bfb3e",
+              "name": "currency",
+              "type": "string",
+              "value": "={{ $('Call: Extract invoice fields').item.json.record.currency }}"
+            },
+            {
+              "id": "dadcf44b-7da5-40f4-8740-e98b99d1991a",
+              "name": "filename",
+              "type": "string",
+              "value": "={{ $('Attach duplicate result to PDF').item.json.filename }}"
+            },
+            {
+              "id": "6f08f6a5-a18a-4e8a-898a-586ed6f9207f",
+              "name": "issues",
+              "type": "array",
+              "value": "={{ [$('Call: Extract invoice fields').item.json.error_code, ...$json.issues.map((i) => i.code)].filter(Boolean) }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "2ac04f60-f260-5373-8eba-8840cae11bb2",
+      "name": "Prepare notification: stored or conflict",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2600,
+        -40
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5a0ccb0b-f85a-48a4-818b-fc7d45993aac",
+              "name": "status",
+              "type": "string",
+              "value": "={{ $json.outcome }}"
+            },
+            {
+              "id": "faf56314-8055-4d38-8e76-57d57b22345b",
+              "name": "invoice_id",
+              "type": "string",
+              "value": "={{ $json.invoice_id }}"
+            },
+            {
+              "id": "7b5108d8-b690-4ca0-8eb8-7ed4d5d66bc1",
+              "name": "invoice_number",
+              "type": "string",
+              "value": "={{ $('Call: Validate invoice').item.json.invoice.invoice_number }}"
+            },
+            {
+              "id": "5edbd897-9cfc-4512-84c5-e7990d69a462",
+              "name": "sender",
+              "type": "string",
+              "value": "={{ $('Call: Validate invoice').item.json.invoice.sender }}"
+            },
+            {
+              "id": "1756ddbc-6dc5-44d8-87b1-c93781a40dfe",
+              "name": "amount",
+              "type": "string",
+              "value": "={{ String($('Call: Validate invoice').item.json.invoice.amount) }}"
+            },
+            {
+              "id": "9f7a0e56-6d5c-4ce5-888e-4d2bad12e588",
+              "name": "currency",
+              "type": "string",
+              "value": "={{ $('Call: Validate invoice').item.json.invoice.currency }}"
+            },
+            {
+              "id": "8f887771-24f8-4778-83a0-b16725f9089d",
+              "name": "filename",
+              "type": "string",
+              "value": "={{ $('Attach duplicate result to PDF').item.json.filename }}"
+            },
+            {
+              "id": "b76e45d6-ed98-41f7-8d7e-9921169422be",
+              "name": "issues",
+              "type": "array",
+              "value": "={{ $json.reason ? [$json.reason] : [] }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "19e10ccd-9325-55eb-a3dc-0dec3366e721",
+      "name": "Route by store outcome",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2340,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "545ab781-ea8a-49e7-8f36-8cc314f4edd9",
+                    "leftValue": "={{ $json.outcome }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "STORED"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                }
+              },
+              "outputKey": "STORED",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "212a2c29-3c7a-4bcf-8684-a4cda1e4509f",
+                    "leftValue": "={{ $json.outcome }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "CONFLICT"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                }
+              },
+              "outputKey": "CONFLICT",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "061149d0-1700-4ee6-8869-b91d3d928af0",
+                    "leftValue": "={{ $json.outcome }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "DUPLICATE"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                }
+              },
+              "outputKey": "DUPLICATE",
+              "renameOutput": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "18fc2d1e-5ad1-54e8-8815-64b51cbc5a53",
+      "name": "Split one item per PDF attachment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "\n// Plumbing only: one output item per PDF binary, provenance fields copied, no content read.\nconst out = [];\n$input.all().forEach((item, index) => {\n  for (const [key, file] of Object.entries(item.binary ?? {})) {\n    const mime = String(file.mimeType ?? '').toLowerCase();\n    if (mime !== 'application/pdf' && mime !== 'application/x-pdf') continue;\n    out.push({\n      json: { message_id: item.json.id, attachment_id: key, filename: file.fileName ?? null },\n      binary: { invoice_pdf: file },\n      pairedItem: { item: index },\n    });\n  }\n});\nreturn out;"
+      }
+    },
+    {
+      "id": "447e3a01-187e-5c46-95c6-7e01432de804",
+      "name": "Watch inbox for emails with PDF",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "filters": {
+          "includeSpamTrash": false,
+          "q": "has:attachment filename:pdf",
+          "readStatus": "both"
+        },
+        "options": {
+          "dataPropertyAttachmentsPrefixName": "attachment_",
+          "downloadAttachments": true
+        },
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail (secondary account)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Already stored?": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Final status: duplicate skipped",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Call: Extract invoice fields",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Attach duplicate result to PDF": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Already stored?",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Call: Check duplicate invoice": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Attach duplicate result to PDF",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Call: Extract invoice fields": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Call: Validate invoice",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Call: Send invoice notification": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Final status: notified",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Call: Store invoice": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Route by store outcome",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Call: Validate invoice": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Invoice valid?",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Hash PDF bytes (SHA-256)": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Call: Check duplicate invoice",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Invoice valid?": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Call: Store invoice",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Prepare notification: review needed",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Prepare notification: review needed": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Call: Send invoice notification",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Prepare notification: stored or conflict": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Call: Send invoice notification",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Route by store outcome": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Prepare notification: stored or conflict",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Prepare notification: stored or conflict",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Final status: duplicate skipped",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Split one item per PDF attachment": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Hash PDF bytes (SHA-256)",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Watch inbox for emails with PDF": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Split one item per PDF attachment",
+            "type": "main"
+          }
+        ]
+      ]
+    }
+  }
+}

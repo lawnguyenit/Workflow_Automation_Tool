@@ -1,0 +1,11 @@
+{
+  "name": "invoice-intake-code",
+  "private": true,
+  "description": "Plain JavaScript rules used by the n8n Code nodes. No dependencies.",
+  "license": "UNLICENSED",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test",
+    "build:workflows": "node tools/build-workflows.js"
+  }
+}
