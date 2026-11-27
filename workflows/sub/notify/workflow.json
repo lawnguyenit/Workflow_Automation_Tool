@@ -1,0 +1,232 @@
+{
+  "id": "wfNotifyInvoice0",
+  "name": "Send invoice notification",
+  "description": "Sub-workflow: send one plain-text notification email about an invoice outcome.",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Send invoice notification\nInput: `status` (STORED|CONFLICT|REVIEW_REQUIRED), `invoice_number`, `sender`, `amount`, `currency`, `invoice_id`, `filename`, `issues` (array).\nOutput: `{ notified, channel, provider_message_id }`.\n\nSends one plain-text email through the \"Gmail (secondary account)\" credential.\nNo email body or attachment content is copied into the message, only the extracted fields and issue codes.\nSet the recipient in **Notification settings**.",
+        "width": 620,
+        "height": 280,
+        "color": 7
+      },
+      "id": "6ef9786a-26f3-492f-81db-74745222700c",
+      "name": "Note: what this does",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "status",
+              "type": "string"
+            },
+            {
+              "name": "invoice_number",
+              "type": "string"
+            },
+            {
+              "name": "sender",
+              "type": "string"
+            },
+            {
+              "name": "amount",
+              "type": "string"
+            },
+            {
+              "name": "currency",
+              "type": "string"
+            },
+            {
+              "name": "invoice_id",
+              "type": "string"
+            },
+            {
+              "name": "filename",
+              "type": "string"
+            },
+            {
+              "name": "issues",
+              "type": "array"
+            }
+          ]
+        }
+      },
+      "id": "f1b09eb7-a05e-4ee7-8dd5-c878e71247ff",
+      "name": "When called by another workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ff13b7b2-fbed-4856-8884-2658e32eab32",
+              "name": "notify_to",
+              "value": "REPLACE_WITH_RECIPIENT@example.invalid",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "4b76ecc3-51a9-44bc-8569-f6e04e9cb849",
+      "name": "Notification settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst SUBJECTS = {\n  STORED: 'Invoice stored',\n  CONFLICT: 'Invoice conflict: same email/PDF, different extracted data',\n  REVIEW_REQUIRED: 'Invoice needs manual review',\n};\nreturn $input.all().map((item) => {\n  const j = item.json;\n  const issues = Array.isArray(j.issues) ? j.issues.map((i) => (typeof i === 'string' ? i : i && i.code)).filter(Boolean) : [];\n  const lines = [\n    `Status: ${j.status}`,\n    `File: ${j.filename ?? '-'}`,\n    `Invoice number: ${j.invoice_number ?? '-'}`,\n    `Sender: ${j.sender ?? '-'}`,\n    `Amount: ${j.amount ?? '-'} ${j.currency ?? ''}`.trim(),\n    `Stored row id: ${j.invoice_id ?? '-'}`,\n  ];\n  if (issues.length) lines.push(`Issues: ${[...new Set(issues)].join(', ')}`);\n  lines.push('', `n8n execution: ${$execution.id}`);\n  return { json: { notify_to: j.notify_to, subject: SUBJECTS[j.status] ?? `Invoice: ${j.status}`, body: lines.join('\\n') } };\n});"
+      },
+      "id": "9b9cee68-2286-435c-892d-76060c0868e4",
+      "name": "Compose notification text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.notify_to }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "ef8a1dde-459b-43c8-885c-8053bfe6f524",
+      "name": "Send notification email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        660,
+        0
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail (secondary account)"
+        }
+      },
+      "webhookId": "9beba5df-a763-4186-8c38-00950caf8b8c"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b646ee09-c57e-482e-85c0-9e60aa321925",
+              "name": "notified",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "2f95ec80-7e0f-4aa4-8000-4a6f07fd3290",
+              "name": "channel",
+              "value": "gmail",
+              "type": "string"
+            },
+            {
+              "id": "15ae7b3c-7112-43bf-84d3-00468356eb6a",
+              "name": "provider_message_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "65da0046-8c3b-4aa2-8a4d-f5f383f27aee",
+      "name": "Return notification result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "When called by another workflow": {
+      "main": [
+        [
+          {
+            "node": "Notification settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notification settings": {
+      "main": [
+        [
+          {
+            "node": "Compose notification text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose notification text": {
+      "main": [
+        [
+          {
+            "node": "Send notification email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send notification email": {
+      "main": [
+        [
+          {
+            "node": "Return notification result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "callerPolicy": "workflowsFromAList",
+    "callerIds": "wfInvoiceIntake0",
+    "errorWorkflow": "wfErrorHandler00"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "generatedBy": "code/tools/build-workflows.js"
+  },
+  "tags": []
+}

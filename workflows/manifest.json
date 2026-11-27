@@ -1,0 +1,57 @@
+{
+  "description": "Workflows of this project. Import order: error-handler, sub/*, invoice-intake. Ids are fixed in each file.",
+  "workflows": [
+    {
+      "name": "Process invoice emails",
+      "id": "wfInvoiceIntake0",
+      "file": "workflows/invoice-intake/workflow.json"
+    },
+    {
+      "name": "Check duplicate invoice",
+      "id": "wfCheckDuplic000",
+      "file": "workflows/sub/check-duplicate/workflow.json"
+    },
+    {
+      "name": "Extract invoice fields",
+      "id": "wfExtractInvoic0",
+      "file": "workflows/sub/extract-invoice/workflow.json"
+    },
+    {
+      "name": "Validate invoice",
+      "id": "wfValidateInvoi0",
+      "file": "workflows/sub/validate-invoice/workflow.json"
+    },
+    {
+      "name": "Store invoice",
+      "id": "wfStoreInvoice00",
+      "file": "workflows/sub/store-invoice/workflow.json"
+    },
+    {
+      "name": "Send invoice notification",
+      "id": "wfNotifyInvoice0",
+      "file": "workflows/sub/notify/workflow.json"
+    },
+    {
+      "name": "Handle workflow errors",
+      "id": "wfErrorHandler00",
+      "file": "workflows/error-handler/workflow.json"
+    }
+  ],
+  "credentials": [
+    {
+      "name": "Gmail (secondary account)",
+      "type": "gmailOAuth2",
+      "placeholder_id": "REPLACE_GMAIL_CREDENTIAL_ID"
+    },
+    {
+      "name": "Gemini API",
+      "type": "googlePalmApi",
+      "placeholder_id": "REPLACE_GEMINI_CREDENTIAL_ID"
+    },
+    {
+      "name": "Postgres (local)",
+      "type": "postgres",
+      "placeholder_id": "REPLACE_POSTGRES_CREDENTIAL_ID"
+    }
+  ]
+}
