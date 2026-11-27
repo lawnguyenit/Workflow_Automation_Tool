@@ -8,7 +8,7 @@ This folder tracks the supplied Upwork brief as a bounded portfolio exercise. It
 - The pipeline design is **proposed**, not design-ready for live execution. Google OAuth branding is configured in External/Testing mode and the user accepted the separate Google User Data Policy for this private test app. Choosing whether Forms scopes apply to the current Google account or a dedicated test account remains an owner gate, along with GHL matching/pipeline rules, AI rubric/budget, and follow-up policy/event sources.
 - No live Forms, GHL, LLM, or lead-follow-up operation has been executed. The test Form is private/unpublished and the n8n poller remains inactive.
 - Individual module tests and synthetic PostgreSQL integrations pass as recorded in `../verification.md`; paid API calls are explicitly deferred. See [provider cost checklist](COSTS.md).
-- The current full-brief audit snapshot is [AUDIT-0.13.0.yaml](../AUDIT-0.13.0.yaml), verdict `FAILED_AUDIT`. Release 0.14.0 adds separately verified CRM same-event replay controls but still does not compose or accept a complete source-to-CRM/follow-up path; see the current [verification record](../verification.md).
+- The current full-brief audit snapshot is [AUDIT-0.13.0.yaml](../../../../docs/history/project-state/AUDIT-0.13.0.yaml), verdict `FAILED_AUDIT`. Release 0.14.0 adds separately verified CRM same-event replay controls but still does not compose or accept a complete source-to-CRM/follow-up path; see the current [verification record](../../../../docs/history/project-state/verification.md).
 
 ## Artifacts
 
@@ -19,6 +19,6 @@ This folder tracks the supplied Upwork brief as a bounded portfolio exercise. It
 - [TASKS.yaml](TASKS.yaml): bounded owner and workflow-lead work with gates and verification criteria.
 - [COSTS.md](COSTS.md): provider costs, quotas, customer-owned accounts, and the paid-test policy.
 - [STATUS-MAP.md](STATUS-MAP.md): visual pipeline state, module test evidence, client gates, cost notes, and the real-job debugging path.
-- [Pre-job layered module-readiness audit](../AUDIT-pre-job-readiness-2026-10-03.yaml): separates local/mock gaps from client-bound live checks; supersedes the old full-brief verdict as the readiness assessment for work before a client job.
+- [Pre-job layered module-readiness audit](../../../../docs/history/project-state/AUDIT-pre-job-readiness-2026-10-03.yaml): separates local/mock gaps from client-bound live checks; supersedes the old full-brief verdict as the readiness assessment for work before a client job.
 
 Do not mark a blocked edge complete based on a module unit test. Re-audit the full composed path after owner inputs and runtime evidence exist.

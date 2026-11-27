@@ -82,7 +82,7 @@ To debug an inaccessible customer instance, an n8n export alone may show graph s
 
 ## Evidence links
 
-- [Release 0.14.0 verification and known gaps](../verification.md#current-release-0140--cost-aware-module-readiness-and-ghl-event-ledgers)
-- [Release notes](../../releases/0.14.0.md)
+- [Release 0.14.0 verification and known gaps](../../../../docs/history/project-state/verification.md#current-release-0140--cost-aware-module-readiness-and-ghl-event-ledgers)
+- [Release notes](../../../../docs/history/releases/0.14.0.md)
 - [Capability contracts and job acceptance gates](PIPELINE.yaml)
 - [Normalized job brief and unresolved owner decisions](JOB_SPEC.yaml)
