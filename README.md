@@ -1,61 +1,99 @@
 # Workflow Automation Modules
 
-## Purpose
+Reusable building blocks for workflow automation (n8n first, plain Python/HTTP also supported), with a reference "Intelligent Document Intake" workflow: read an email with a PDF invoice, extract the fields, validate them, store them in PostgreSQL, and prepare a notification.
 
-Build a reusable library of workflow module contracts and, when jobs require them, concrete implementations. n8n is the main expected target, while the contracts remain usable by other platforms and code-based workflows.
+**Status:** portfolio system, built and tested locally with synthetic data. Not a client deployment, not used in production. No live Gmail, OpenAI, Slack, CRM or Google Forms call has been made (see "Not yet done").
 
-## Working rule
+Author: Lam-Nguyen Nguyen. CV: https://cv.lnit.id.vn
 
-Keep the capability model platform-neutral and implementations replaceable. The initial reference system is the Intelligent Document Intake Pipeline. A second local lead-management reference now exercises webhook-shaped intake, manual-review status, and PostgreSQL source-event idempotency. These are portfolio systems, not client deployments; document any provider connection as unverified until credentials and target environments are available. Grow the wider catalog from real job demand.
+## Tóm tắt (Tiếng Việt)
 
-## Pipeline areas
+- Bộ module tự động hóa quy trình làm việc (workflow), ưu tiên n8n: nhận email có hóa đơn PDF, đọc và trích xuất thông tin, kiểm tra, lưu vào cơ sở dữ liệu PostgreSQL, rồi tạo thông báo.
+- Đây là hệ thống mẫu để làm portfolio, chạy trên máy cá nhân với dữ liệu giả. Chưa triển khai cho khách hàng, chưa chạy production, chưa gọi dịch vụ thật (Gmail, OpenAI, Slack, CRM).
+- Hiện có: API chạy được ở chế độ thử (DRY_RUN) không cần khóa dịch vụ nào, 198 bài test tự động đạt (chạy lại ngày 27/11/2026), mẫu workflow n8n để nhập vào.
+- Mã được viết bằng công cụ AI (Claude, Codex) theo thiết kế và yêu cầu của tác giả, sau đó tác giả và các agent kiểm tra độc lập rà soát và kiểm thử.
 
-- **Input:** Gmail, webhooks, Google Drive, Dropbox, forms.
-- **Processing:** OCR, PDF parsing, validation, LLM extraction, classification, deduplication.
-- **Storage:** PostgreSQL, Supabase, Sheets.
-- **Output:** Slack, email, CRM, calendar, API.
-- **Cross-cutting operations:** deployment, logging, retries, monitoring, capacity, concurrency, security, recovery, and replay.
+## What problem it solves
 
-These are candidate catalog areas, not commitments to implement every connector.
+- Small teams receive documents (invoices, forms) by email or form and copy data by hand. The reference workflow shows how to automate that path.
+- Automations often fail quietly: duplicate runs, double writes, retries that send twice. Each module here documents its duplicate handling, retry and failure behavior, and the tests cover those cases.
+- When you only have the workflow nodes and no access to the client's system, debugging is hard. Modules return sanitized, bounded diagnostics, and failed runs go into an incident log with no raw personal data.
 
-## Module quality record
+## What works today and what does not
 
-Each future module should state its purpose and versioned contract; accepted inputs and returned outputs; dependencies and setup; expected volume and limits; idempotency and duplicate semantics; concurrent-write behavior; retry and timeout rules; partial-failure and recovery behavior; logs, metrics, and safe diagnostics; credential and data-handling rules; tested failure cases; compatibility and rollback notes; and known gaps.
+Verified from code, tests and docs in this repo. Test status below was re-run on 2026-11-27 unless noted.
 
-See [the project plan](docs/plan.md) and [project state](docs/project-state/README.md).
+### Works today (synthetic data, local)
 
-The draft contract and reusable module checklist are in [module-contract.md](docs/module-contract.md) and [module-quality-template.md](docs/module-quality-template.md).
+- Full document-intake graph in `DRY_RUN` mode: email fixture -> PDF text -> field extraction -> validation -> storage preview -> notification preview. Re-checked: the API returned `SUCCESS` for all steps with no credentials.
+- Unit test suite: `uv run --extra dev pytest -q` gives **198 passed** (about 2 seconds).
+- Module API with catalog, per-module and per-workflow run routes, execution modes `DRY_RUN`, `REPLAY`, `MOCK`, `REAL`.
+- PostgreSQL storage with idempotency keys (duplicate and changed-payload handling), a notification outbox, a source-poll lease/checkpoint, an incident log, and ledgers for CRM and LLM calls. Evidence: 10 Docker Compose + PostgreSQL integration scripts in `tests/integration/` (recorded as passing in `docs/project-state/verification.md`; **not re-run for this README**).
+- n8n starter workflow `workflows/n8n/intelligent-document-intake.demo.json` (six HTTP nodes calling the API in `DRY_RUN`). A separate lead-management preview workflow was imported and run once in a local n8n (recorded in the project-state docs; not re-run here).
+- Reusable adapter modules with mocked-HTTP tests: HighLevel (GHL) contact upsert, opportunity upsert, contact tags; Gmail send; lead intake, qualification and follow-up gate.
 
-## Run the synthetic portfolio
+### Not yet done / not verified
 
-Requirements: Python 3.12+, `uv`, and no provider credentials for the dry-run path.
+- No live provider call has been made: Gmail read/send, OpenAI extraction or qualification, Slack, HighLevel CRM, Google Forms API. Adapters are tested against mocks only.
+- The Google Forms API poller n8n workflow is imported but inactive; OAuth is not granted and it has never run.
+- The lead-management brief is only partly built. The graph ends at PostgreSQL storage; CRM and follow-up modules exist but are not wired into it.
+- Safety limits are partial: the LLM cap counts requests per day, not money; there is no external alerting, retry scheduler or retention job.
+- The API uses one shared bearer key, not per-user login. Keep it on loopback/private network. Do not use with client documents before reviewing n8n data retention and access.
+- The n8n JSON files are starter templates; they must be validated against the exact n8n version used for a real job.
+- No real client data, no client deployment, no production use.
 
-```powershell
+The authoritative record is in [project state](docs/project-state/README.md) (intent, decisions, implementation, verification). A proposal is never counted as implemented there.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    n8n[n8n workflow<br/>or any HTTP caller] --> api[FastAPI module API]
+    api --> input[Input<br/>email fixture / Gmail]
+    input --> proc[Processing<br/>PDF text, LLM extraction, validation]
+    proc --> store[(PostgreSQL<br/>idempotent storage)]
+    store --> out[Output<br/>notification outbox / Slack]
+    api -. failures .-> inc[(Incident log)]
+```
+
+Stages are input, processing, storage and output. Cross-cutting concerns (idempotency, retry, concurrency, security, recovery, observability) are documented per module. Contracts are platform-neutral so n8n can be replaced.
+
+## Quick start
+
+Needs Python 3.12+ and `uv`. No provider credentials are needed for the dry run.
+
+```
 uv sync --extra dev
+uv run pytest -q
 uv run uvicorn workflow_automation.api:app --app-dir src --host 127.0.0.1 --port 8000
 ```
 
-In another terminal, run the full synthetic graph without database writes or provider calls:
+In another terminal (the repo documents the PowerShell form; this is the same call with curl):
 
-```powershell
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/v1/workflows/intelligent_document_intake/runs -ContentType 'application/json' -Body '{}'
+```
+curl -X POST http://127.0.0.1:8000/v1/workflows/intelligent_document_intake/runs -H "Content-Type: application/json" -d "{}"
 ```
 
-The API returns sanitized step states and invoice fields; it omits attachment bytes and extracted PDF text from its aggregate workflow response. `/healthz` is a process health check, and `/v1/catalog` lists module definitions, implementations, instances, workflow definitions, and workflow instances. `POST /v1/instances/{instance_id}/runs` lets external orchestrators run one module, while `/v1/workflow-instances/{workflow_instance_id}/runs` runs a concrete workflow binding. `MOCK`/`REAL` and any live Gmail read require `WORKFLOW_API_KEY` and `Authorization: Bearer <key>`; when the key is unset those operations are rejected. `DRY_RUN`/`REPLAY` requests work without a key so the n8n template remains runnable. The API does not enforce synthetic-only preview payloads or verify that `REPLAY` inputs were captured and sanitized; they may contain sensitive business data, so keep the service on loopback/private networking and sanitize replay data before submission. Do not expose this API publicly without a stronger deployment access boundary.
+`/healthz` checks the process and `/v1/catalog` lists modules and workflows. For the PostgreSQL + n8n Docker Compose stack (copy `.env.example` to `.env`, set local secrets, `docker compose up --build`), the PowerShell call, execution modes and the lead-management reference, see the [run guide](docs/run-guide.md).
 
-For an opt-in PostgreSQL/n8n local stack, copy `.env.example` to `.env`, replace the PostgreSQL and n8n local-only secrets, then run `docker compose up --build`. Set a long random `WORKFLOW_API_KEY` before allowing `MOCK`/`REAL` calls or live Gmail reads. Use a URL-safe PostgreSQL password (letters, numbers, hyphen, underscore) because Compose passes it inside `DATABASE_URL`. The app is available on `127.0.0.1:8000` and n8n on `127.0.0.1:5678`. Import `workflows/n8n/intelligent-document-intake.demo.json`; its six HTTP nodes call the module-instance API individually in `DRY_RUN` and gate each step on `SUCCESS`. The JSON is a starter template and needs validation against the exact n8n image/version selected for a job. If the workflow is changed to `MOCK`/`REAL` or live Gmail input, configure matching Header Auth credentials on the n8n HTTP nodes. Never use the demo workflow to handle client documents without reviewing n8n execution-data retention and access first.
+## Repository layout
 
-### Lead-management reference
+```
+src/workflow_automation/   framework core, API, modules (input, processing, storage, output, crm), PostgreSQL infrastructure
+tests/                     unit tests and Docker/PostgreSQL integration scripts
+workflows/n8n/             importable n8n workflow templates
+fixtures/                  synthetic emails and PDFs
+infra/postgres/            database initialisation
+docs/                      plan, module contracts, per-module guarantees, runbooks, release notes, project state
+Dockerfile, docker-compose.yml, .env.example
+```
 
-`workflows/n8n/lead-management-local.demo.json` is a private, manual-trigger preview with a synthetic `.invalid` email address. It invokes `portfolio.lead_management_local` in `DRY_RUN`, so it does not write to PostgreSQL or send a message. The real local API/DB path has also been exercised separately with synthetic payloads in `MOCK` mode: first-write, same-event duplicate, changed-payload conflict, missing-field review, and API response redaction. Current results intentionally end at `REVIEW_REQUIRED`; there is no configured GHL, qualification rubric, OpenAI API, email sender, or public form callback. See [lead-management module contract and limits](docs/modules/lead-management-reference.md).
+Key docs: [run guide](docs/run-guide.md), [project plan](docs/plan.md), [module contract](docs/module-contract.md), [module quality template](docs/module-quality-template.md), [portfolio module guarantees](docs/modules/portfolio-modules.md), [lead-management reference](docs/modules/lead-management-reference.md), [runbooks](docs/runbooks/workflow-incidents.md), [releases](docs/releases/0.14.0.md) (0.1.0 to 0.14.0 in `docs/releases/`).
 
-The private Google Form draft `Lead Intake Lab - Test Only` is unpublished and linked to a response Sheet. Local n8n and API ports bind to loopback. Do not publish the form or expose a public callback unless the owner explicitly requests it after the access and data-handling setup is understood. The user's VPS that hosts an online game is outside this project.
+## How it was built
 
-### Execution modes
+Designed and directed by Lam-Nguyen Nguyen; code written with AI coding agents (Claude, Codex) under his specifications, then reviewed and tested by him and independent agent reviews (audit records are in `docs/project-state/`).
 
-- `DRY_RUN`: preview extraction and validation; PostgreSQL writes and output side effects are skipped. The API does not restrict inputs to fixtures, so caller-supplied business data may be processed.
-- `REPLAY`: deterministic replay path; persistence and delivery are skipped.
-- `MOCK`: deterministic/mock extraction; PostgreSQL and the notification outbox are written, but no output provider is contacted. Use only with a deliberate local/test database.
-- `REAL`: Gmail read, OpenAI extraction, PostgreSQL, and Slack can run only when each is configured. This mode is not an end-to-end claim and needs per-client authorization, policy, credentials, retention, and operational setup.
+## Contact
 
-Details on duplicate handling, concurrency, limits, recovery, and unverified integrations are in [portfolio module guarantees](docs/modules/portfolio-modules.md). Release notes: [0.1.0](docs/releases/0.1.0.md), [0.2.0](docs/releases/0.2.0.md).
+CV and contact: https://cv.lnit.id.vn
